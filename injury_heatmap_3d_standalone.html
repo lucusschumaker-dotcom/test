@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Injury Density — Anatomical Mannequin</title>
-s.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -112,9 +112,6 @@ examples/js/controls/OrbitControls.js"></script>
 </div>
 
 <script>
-  // =====================================================================
-  // INJURY DATA (placeholder — wire to Power BI later)
-  // =====================================================================
   const INJURY_DATA = [
     { id: "abdomen",     label: "Abdomen",             count: 8,  part: "abdomen"  },
     { id: "ankle",       label: "Ankle",               count: 15, part: "ankle"    },
@@ -135,9 +132,6 @@ examples/js/controls/OrbitControls.js"></script>
   const dataById   = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
   const multipleData = INJURY_DATA.find(d => d.id === "multiple");
 
-  // =====================================================================
-  // COLOR RAMP: light grey -> dark red
-  // =====================================================================
   function heatColor(t) {
     t = Math.max(0, Math.min(1, t));
     const start = [211, 211, 211], end = [139, 0, 0];
@@ -147,9 +141,6 @@ examples/js/controls/OrbitControls.js"></script>
     return { css: `rgb(${r},${g},${b})`, hex: (r << 16) | (g << 8) | b };
   }
 
-  // =====================================================================
-  // THREE.JS SETUP
-  // =====================================================================
   const mount = document.getElementById('canvas-mount');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0a0d10);
@@ -161,7 +152,6 @@ examples/js/controls/OrbitControls.js"></script>
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(mount.clientWidth, mount.clientHeight);
   renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.shadowMap.enabled = false;
   mount.appendChild(renderer.domElement);
 
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -171,7 +161,6 @@ examples/js/controls/OrbitControls.js"></script>
   controls.minDistance = 2.5;
   controls.maxDistance = 12;
 
-  // Lighting rig — key + fill + rim for that dramatic dashboard silhouette
   scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   const key = new THREE.DirectionalLight(0xffffff, 0.85);
   key.position.set(4, 6, 5); scene.add(key);
@@ -180,21 +169,9 @@ examples/js/controls/OrbitControls.js"></script>
   const rim = new THREE.DirectionalLight(0xffffff, 0.55);
   rim.position.set(0, 3, -6); scene.add(rim);
 
-  // =====================================================================
-  // MATERIALS — matte medical mannequin
-  // =====================================================================
-  const skinMat = new THREE.MeshStandardMaterial({
-    color: 0xd6d6d6, roughness: 0.72, metalness: 0.04,
-  });
-  const jointMat = new THREE.MeshStandardMaterial({
-    color: 0xb8b8b8, roughness: 0.55, metalness: 0.08,
-  });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xd6d6d6, roughness: 0.72, metalness: 0.04 });
+  const jointMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.55, metalness: 0.08 });
 
-  // =====================================================================
-  // MANNEQUIN — procedural, no external assets
-  // Every anchor position is defined in the mannequin's local space,
-  // so the whole thing sways as one.
-  // =====================================================================
   const mannequin = new THREE.Group();
   scene.add(mannequin);
 
@@ -207,7 +184,6 @@ examples/js/controls/OrbitControls.js"></script>
     return m;
   }
 
-  // ---------- HEAD (LatheGeometry — smooth egg) ----------
   {
     const pts = [];
     for (let i = 0; i <= 24; i++) {
@@ -221,19 +197,17 @@ examples/js/controls/OrbitControls.js"></script>
     addMesh(headGeo, skinMat, [0, 1.80, 0]);
   }
 
-  // ---------- NECK (tapered cylinder) ----------
   addMesh(new THREE.CylinderGeometry(0.10, 0.13, 0.22, 24), skinMat, [0, 1.47, 0]);
 
-  // ---------- TORSO (LatheGeometry — anatomical silhouette) ----------
   {
     const torsoPts = [
       new THREE.Vector2(0.05, 0.00),
       new THREE.Vector2(0.24, 0.02),
-      new THREE.Vector2(0.28, 0.15),   // waist narrow
-      new THREE.Vector2(0.32, 0.32),   // lower ribs
-      new THREE.Vector2(0.38, 0.55),   // chest widening
-      new THREE.Vector2(0.40, 0.72),   // upper chest
-      new THREE.Vector2(0.34, 0.86),   // shoulder line
+      new THREE.Vector2(0.28, 0.15),
+      new THREE.Vector2(0.32, 0.32),
+      new THREE.Vector2(0.38, 0.55),
+      new THREE.Vector2(0.40, 0.72),
+      new THREE.Vector2(0.34, 0.86),
       new THREE.Vector2(0.18, 0.94),
       new THREE.Vector2(0.02, 1.00),
     ];
@@ -241,7 +215,6 @@ examples/js/controls/OrbitControls.js"></script>
     addMesh(torsoGeo, skinMat, [0, 0.42, 0]);
   }
 
-  // ---------- PELVIS / HIPS (LatheGeometry) ----------
   {
     const hipPts = [
       new THREE.Vector2(0.02, 0.00),
@@ -255,28 +228,17 @@ examples/js/controls/OrbitControls.js"></script>
     addMesh(hipGeo, skinMat, [0, 0.06, 0]);
   }
 
-  // ---------- BALL JOINTS + LIMBS ----------
-  // Shoulders
   addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [-0.42, 1.30, 0]);
   addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [ 0.42, 1.30, 0]);
-
-  // Upper arms (tapered cylinders slightly angled outward)
   addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [-0.50, 0.99, 0], [0, 0, 0.15]);
   addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [ 0.50, 0.99, 0], [0, 0, -0.15]);
-
-  // Elbows
   addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [-0.55, 0.66, 0]);
   addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [ 0.55, 0.66, 0]);
-
-  // Forearms
   addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [-0.58, 0.34, 0], [0, 0, 0.06]);
   addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [ 0.58, 0.34, 0], [0, 0, -0.06]);
-
-  // Wrists
   addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [-0.60, 0.02, 0]);
   addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [ 0.60, 0.02, 0]);
 
-  // Hands (flattened ellipsoids)
   {
     const handL = addMesh(new THREE.SphereGeometry(0.10, 22, 18), skinMat, [-0.60, -0.12, 0]);
     handL.scale.set(0.65, 1.35, 0.5);
@@ -284,27 +246,17 @@ examples/js/controls/OrbitControls.js"></script>
     handR.scale.set(0.65, 1.35, 0.5);
   }
 
-  // Hip joints
   addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [-0.16, -0.05, 0]);
   addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [ 0.16, -0.05, 0]);
-
-  // Thighs
   addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [-0.18, -0.44, 0]);
   addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [ 0.18, -0.44, 0]);
-
-  // Knees
   addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [-0.18, -0.84, 0]);
   addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [ 0.18, -0.84, 0]);
-
-  // Shins
   addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [-0.18, -1.22, 0]);
   addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [ 0.18, -1.22, 0]);
-
-  // Ankles
   addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [-0.18, -1.60, 0]);
   addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [ 0.18, -1.60, 0]);
 
-  // Feet (extruded shape for a proper foot silhouette)
   {
     const footShape = new THREE.Shape();
     footShape.moveTo(-0.06, -0.05);
@@ -315,11 +267,10 @@ examples/js/controls/OrbitControls.js"></script>
     const footGeo = new THREE.ExtrudeGeometry(footShape, {
       depth: 0.08, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 3, curveSegments: 24,
     });
-    const footL = addMesh(footGeo, skinMat, [-0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
-    const footR = addMesh(footGeo, skinMat, [ 0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
+    addMesh(footGeo, skinMat, [-0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
+    addMesh(footGeo, skinMat, [ 0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
   }
 
-  // Faint disc under the feet (grounding shadow substitute)
   {
     const discGeo = new THREE.CircleGeometry(0.9, 48);
     const discMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 });
@@ -329,26 +280,16 @@ examples/js/controls/OrbitControls.js"></script>
     mannequin.add(disc);
   }
 
-  // Center the mannequin on the origin vertically
   mannequin.position.y = 0.15;
 
-  // =====================================================================
-  // INJURY WEB CAGES (geodesic wireframes floating around each region)
-  // Positions are in mannequin-local space so they sway with the model.
-  // =====================================================================
   function createWeb(radius, colorHex) {
     const group = new THREE.Group();
     const geo = new THREE.IcosahedronGeometry(radius, 1);
     const shell = new THREE.Mesh(geo,
-      new THREE.MeshBasicMaterial({
-        color: colorHex, transparent: true, opacity: 0.14,
-        depthWrite: false, side: THREE.DoubleSide,
-      }));
+      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide }));
     const edges = new THREE.EdgesGeometry(geo);
     const lines = new THREE.LineSegments(edges,
-      new THREE.LineBasicMaterial({
-        color: colorHex, transparent: true, opacity: 0.9, linewidth: 1,
-      }));
+      new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.9 }));
     group.add(shell); group.add(lines);
     group.userData.shell = shell;
     group.userData.lines = lines;
@@ -357,7 +298,7 @@ examples/js/controls/OrbitControls.js"></script>
     return group;
   }
 
-  const webRegistry = []; // { web, region, id, shell }
+  const webRegistry = [];
   const shellMeshes = [];
   const webByRegion = {};
 
@@ -373,16 +314,14 @@ examples/js/controls/OrbitControls.js"></script>
     webByRegion[region].push(web);
   }
 
-  // ---------- POINT WEBS (single anchor position) ----------
   const POINT_WEBS = [
-    // Region        Position (local)             Radius
     { region: 'eyes',     pos: [-0.08, 1.85, 0.16], radius: 0.06 },
     { region: 'eyes',     pos: [ 0.08, 1.85, 0.16], radius: 0.06 },
     { region: 'neck',     pos: [ 0.00, 1.47, 0.00], radius: 0.13 },
     { region: 'shoulder', pos: [-0.42, 1.30, 0.00], radius: 0.16 },
     { region: 'shoulder', pos: [ 0.42, 1.30, 0.00], radius: 0.16 },
-    { region: 'abdomen',  pos: [ 0.00, 0.85, 0.15], radius: 0.18 },  // front of torso
-    { region: 'back',     pos: [ 0.00, 0.85,-0.15], radius: 0.18 },  // back of torso
+    { region: 'abdomen',  pos: [ 0.00, 0.85, 0.15], radius: 0.18 },
+    { region: 'back',     pos: [ 0.00, 0.85,-0.15], radius: 0.18 },
     { region: 'hand',     pos: [-0.60,-0.14, 0.00], radius: 0.12 },
     { region: 'hand',     pos: [ 0.60,-0.14, 0.00], radius: 0.12 },
     { region: 'ankle',    pos: [-0.18,-1.62, 0.02], radius: 0.11 },
@@ -399,17 +338,15 @@ examples/js/controls/OrbitControls.js"></script>
     registerWeb(web, cfg.region);
   });
 
-  // ---------- SEGMENT WEBS (stretched between two points) ----------
   const SEGMENT_WEBS = [
-    // Region        From (local)            To (local)              Radius
-    { region: 'arm',      from: [-0.48, 1.26, 0], to: [-0.55, 0.68, 0], radius: 0.13 },  // L upper arm
-    { region: 'arm',      from: [-0.55, 0.64, 0], to: [-0.60, 0.06, 0], radius: 0.11 },  // L forearm
-    { region: 'arm',      from: [ 0.48, 1.26, 0], to: [ 0.55, 0.68, 0], radius: 0.13 },  // R upper arm
-    { region: 'arm',      from: [ 0.55, 0.64, 0], to: [ 0.60, 0.06, 0], radius: 0.11 },  // R forearm
-    { region: 'legUpper', from: [-0.16,-0.05, 0], to: [-0.18,-0.82, 0], radius: 0.19 },  // L thigh
-    { region: 'legUpper', from: [ 0.16,-0.05, 0], to: [ 0.18,-0.82, 0], radius: 0.19 },  // R thigh
-    { region: 'legLower', from: [-0.18,-0.86, 0], to: [-0.18,-1.56, 0], radius: 0.14 },  // L shin
-    { region: 'legLower', from: [ 0.18,-0.86, 0], to: [ 0.18,-1.56, 0], radius: 0.14 },  // R shin
+    { region: 'arm',      from: [-0.48, 1.26, 0], to: [-0.55, 0.68, 0], radius: 0.13 },
+    { region: 'arm',      from: [-0.55, 0.64, 0], to: [-0.60, 0.06, 0], radius: 0.11 },
+    { region: 'arm',      from: [ 0.48, 1.26, 0], to: [ 0.55, 0.68, 0], radius: 0.13 },
+    { region: 'arm',      from: [ 0.55, 0.64, 0], to: [ 0.60, 0.06, 0], radius: 0.11 },
+    { region: 'legUpper', from: [-0.16,-0.05, 0], to: [-0.18,-0.82, 0], radius: 0.19 },
+    { region: 'legUpper', from: [ 0.16,-0.05, 0], to: [ 0.18,-0.82, 0], radius: 0.19 },
+    { region: 'legLower', from: [-0.18,-0.86, 0], to: [-0.18,-1.56, 0], radius: 0.14 },
+    { region: 'legLower', from: [ 0.18,-0.86, 0], to: [ 0.18,-1.56, 0], radius: 0.14 },
   ];
 
   const _upVec = new THREE.Vector3(0, 1, 0);
@@ -433,9 +370,6 @@ examples/js/controls/OrbitControls.js"></script>
     registerWeb(web, cfg.region);
   });
 
-  // =====================================================================
-  // INTERACTION (raycast against web shells)
-  // =====================================================================
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const state = { hoveredRegion: null, selectedRegion: null, selectedId: null };
@@ -498,9 +432,6 @@ examples/js/controls/OrbitControls.js"></script>
     renderRankedList(id, selectById);
   }
 
-  // =====================================================================
-  // SIDE PANEL
-  // =====================================================================
   function renderLegend() {
     const bar = document.getElementById('legend-bar');
     bar.innerHTML = '';
@@ -555,20 +486,15 @@ examples/js/controls/OrbitControls.js"></script>
   renderSelected(null);
   renderMultipleCard();
 
-  // =====================================================================
-  // ANIMATE — idle sway + web pulse + line flicker
-  // =====================================================================
   const clock = new THREE.Clock();
 
   function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
 
-    // Subtle idle sway
     mannequin.rotation.y = Math.sin(t * 0.4) * 0.05;
     mannequin.position.y = 0.15 + Math.sin(t * 0.8) * 0.015;
 
-    // Web pulse & flicker
     const pulse = 1 + Math.sin(t * 2) * 0.04;
     webRegistry.forEach(({ web, region }) => {
       const isSegment = web.userData.baseScaleY !== undefined;
@@ -587,9 +513,6 @@ examples/js/controls/OrbitControls.js"></script>
   }
   animate();
 
-  // =====================================================================
-  // RESIZE
-  // =====================================================================
   window.addEventListener('resize', () => {
     const w = mount.clientWidth, h = mount.clientHeight;
     camera.aspect = w / h;
