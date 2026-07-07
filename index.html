@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Injury Density — Interactive 3D Model</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0a0d10;
+    font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+    color: #e8ece8;
+  }
+  #app {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #viewport {
+    flex: 1 1 60%;
+    position: relative;
+  }
+  #canvas-mount {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #canvas-mount.dragging { cursor: grabbing; }
+  #canvas-mount canvas { display: block; }
+
+  .label-top {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    z-index: 2;
+    font-family: ui-monospace, Menlo, monospace;
+    letter-spacing: 1.5px;
+    font-size: 11px;
+    color: #7c8891;
+    text-transform: uppercase;
+  }
+  .controls {
+    position: absolute;
+    bottom: 14px;
+    left: 18px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
+  }
+  .btn {
+    background: #161c20;
+    color: #c8cdd0;
+    border: 1px solid #2a333a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .btn.active {
+    background: #c6ff3d;
+    color: #0a0d10;
+  }
+  .hint {
+    position: absolute;
+    bottom: 14px;
+    right: 18px;
+    font-size: 10.5px;
+    color: #57626a;
+    font-family: ui-monospace, Menlo, monospace;
+    z-index: 2;
+  }
+
+  #panel {
+    flex: 1 1 40%;
+    border-left: 1px solid #1c2226;
+    background: #0d1114;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 280px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: #7c8891;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  #selected-region {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  #selected-region .empty {
+    font-size: 14px;
+    color: #5a656d;
+  }
+  #selected-region .name {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  #selected-region .count {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  #selected-region .unit {
+    font-size: 11px;
+    color: #7c8891;
+  }
+
+  #legend-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #legend-bar div { flex: 1; }
+  #legend-ticks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: #5a656d;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+
+  #ranked-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .rank-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .rank-row.selected {
+    background: #161c20;
+    border: 1px solid #2a333a;
+  }
+  .rank-row .idx {
+    width: 18px;
+    font-size: 11px;
+    color: #57626a;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .rank-row .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .rank-row .name { flex: 1; font-size: 13px; }
+  .rank-row .val {
+    font-size: 13px;
+    font-family: ui-monospace, Menlo, monospace;
+    color: #c8cdd0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <div class="label-top">Injury Density — Interactive Model</div>
+    <div id="canvas-mount"></div>
+    <div class="controls">
+      <button class="btn active" id="btn-autorotate">⏸ Pause spin</button>
+      <button class="btn" id="btn-reset">⟲ Reset view</button>
+    </div>
+    <div class="hint">drag to rotate · click a region for detail</div>
+  </div>
+
+  <div id="panel">
+    <div>
+      <div class="section-label">Selected region</div>
+      <div id="selected-region"><span class="empty">Hover or click a body region on the model</span></div>
+    </div>
+
+    <div>
+      <div class="section-label">Scale</div>
+      <div id="legend-bar"></div>
+      <div id="legend-ticks"><span>0</span><span id="legend-mid"></span><span id="legend-max"></span></div>
+    </div>
+
+    <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
+      <div class="section-label">Hot spots, ranked</div>
+      <div id="ranked-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // -------------------------------------------------------------------
+  // INJURY DATA — replace these counts (and add/remove regions) with
+  // real figures pulled from your Power BI dataset / Excel source.
+  // -------------------------------------------------------------------
+  const INJURY_DATA = [
+    { id: "head", label: "Head", count: 1, part: "head" },
+    { id: "neck", label: "Neck", count: 3, part: "neck" },
+    { id: "l_shoulder", label: "L. Shoulder", count: 14, part: "shoulderL" },
+    { id: "r_shoulder", label: "R. Shoulder", count: 22, part: "shoulderR" },
+    { id: "chest", label: "Chest / Torso", count: 4, part: "torso" },
+    { id: "lower_back", label: "Lower Back", count: 27, part: "lowerBack" },
+    { id: "l_elbow", label: "L. Elbow", count: 6, part: "elbowL" },
+    { id: "r_elbow", label: "R. Elbow", count: 9, part: "elbowR" },
+    { id: "l_wrist", label: "L. Wrist / Hand", count: 11, part: "handL" },
+    { id: "r_wrist", label: "R. Wrist / Hand", count: 19, part: "handR" },
+    { id: "hip", label: "Hip", count: 16, part: "hip" },
+    { id: "l_thigh", label: "L. Thigh / Hamstring", count: 21, part: "thighL" },
+    { id: "r_thigh", label: "R. Thigh / Hamstring", count: 18, part: "thighR" },
+    { id: "l_knee", label: "L. Knee", count: 25, part: "kneeL" },
+    { id: "r_knee", label: "R. Knee", count: 13, part: "kneeR" },
+    { id: "l_ankle", label: "L. Ankle / Foot", count: 8, part: "ankleL" },
+    { id: "r_ankle", label: "R. Ankle / Foot", count: 12, part: "ankleR" },
+  ];
+
+  const maxCount = Math.max(...INJURY_DATA.map(d => d.count));
+  const dataByPart = Object.fromEntries(INJURY_DATA.map(d => [d.part, d]));
+  const dataById = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
+
+  function thermalColor(t) {
+    const stops = [
+      { p: 0, c: [10, 60, 66] },
+      { p: 0.35, c: [24, 130, 122] },
+      { p: 0.6, c: [230, 170, 40] },
+      { p: 0.8, c: [224, 96, 34] },
+      { p: 1, c: [214, 30, 40] },
+    ];
+    let a = stops[0], b = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (t >= stops[i].p && t <= stops[i + 1].p) { a = stops[i]; b = stops[i + 1]; break; }
+    }
+    const span = (b.p - a.p) || 1;
+    const lt = (t - a.p) / span;
+    const r = Math.round(a.c[0] + (b.c[0] - a.c[0]) * lt);
+    const g = Math.round(a.c[1] + (b.c[1] - a.c[1]) * lt);
+    const bl = Math.round(a.c[2] + (b.c[2] - a.c[2]) * lt);
+    return { css: `rgb(${r},${g},${bl})`, hex: (r << 16) | (g << 8) | bl };
+  }
+
+  const NEUTRAL_COLOR = 0x2a2f36;
+
+  function buildFigure() {
+    const group = new THREE.Group();
+    const interactive = [];
+
+    function addPart(part, geo, pos) {
+      const d = dataByPart[part];
+      const t = d ? d.count / maxCount : 0;
+      const color = d ? thermalColor(t).hex : NEUTRAL_COLOR;
+      const mat = new THREE.MeshStandardMaterial({
+        color, roughness: 0.45, metalness: 0.08, emissive: 0x000000, emissiveIntensity: 0,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(...pos);
+      mesh.userData.part = part;
+      mesh.userData.baseColor = color;
+      group.add(mesh);
+      if (d) interactive.push(mesh);
+      return mesh;
+    }
+    function addNeutral(geo, pos) {
+      const mat = new THREE.MeshStandardMaterial({ color: NEUTRAL_COLOR, roughness: 0.6 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(...pos);
+      group.add(mesh);
+      return mesh;
+    }
+
+    addPart("head", new THREE.SphereGeometry(0.34, 24, 24), [0, 3.35, 0]);
+    addPart("neck", new THREE.CylinderGeometry(0.13, 0.15, 0.22, 16), [0, 3.0, 0]);
+    addPart("torso", new THREE.BoxGeometry(0.85, 1.05, 0.45), [0, 2.35, 0]);
+    addPart("lowerBack", new THREE.BoxGeometry(0.72, 0.32, 0.4), [0, 1.68, -0.02]);
+    addPart("hip", new THREE.BoxGeometry(0.78, 0.28, 0.42), [0, 1.38, 0]);
+
+    addPart("shoulderL", new THREE.SphereGeometry(0.19, 16, 16), [-0.56, 2.78, 0]);
+    addPart("shoulderR", new THREE.SphereGeometry(0.19, 16, 16), [0.56, 2.78, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.11, 0.1, 0.62, 12), [-0.58, 2.4, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.11, 0.1, 0.62, 12), [0.58, 2.4, 0]);
+
+    addPart("elbowL", new THREE.SphereGeometry(0.115, 14, 14), [-0.58, 2.06, 0]);
+    addPart("elbowR", new THREE.SphereGeometry(0.115, 14, 14), [0.58, 2.06, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.095, 0.08, 0.56, 12), [-0.58, 1.72, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.095, 0.08, 0.56, 12), [0.58, 1.72, 0]);
+
+    addPart("handL", new THREE.SphereGeometry(0.1, 14, 14), [-0.58, 1.38, 0]);
+    addPart("handR", new THREE.SphereGeometry(0.1, 14, 14), [0.58, 1.38, 0]);
+
+    addPart("thighL", new THREE.CylinderGeometry(0.18, 0.15, 0.75, 14), [-0.24, 0.95, 0]);
+    addPart("thighR", new THREE.CylinderGeometry(0.18, 0.15, 0.75, 14), [0.24, 0.95, 0]);
+
+    addPart("kneeL", new THREE.SphereGeometry(0.145, 14, 14), [-0.24, 0.55, 0]);
+    addPart("kneeR", new THREE.SphereGeometry(0.145, 14, 14), [0.24, 0.55, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 12), [-0.24, 0.12, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 12), [0.24, 0.12, 0]);
+
+    addPart("ankleL", new THREE.BoxGeometry(0.18, 0.14, 0.34), [-0.24, -0.28, 0.06]);
+    addPart("ankleR", new THREE.BoxGeometry(0.18, 0.14, 0.34), [0.24, -0.28, 0.06]);
+
+    group.position.y = -1.9;
+    return { group, interactive };
+  }
+
+  // ---------------- side panel rendering (plain DOM) ----------------
+  function renderLegend() {
+    const bar = document.getElementById("legend-bar");
+    for (let i = 0; i < 40; i++) {
+      const seg = document.createElement("div");
+      seg.style.background = thermalColor(i / 39).css;
+      bar.appendChild(seg);
+    }
+    document.getElementById("legend-mid").textContent = Math.round(maxCount / 2);
+    document.getElementById("legend-max").textContent = maxCount;
+  }
+
+  function renderRankedList(selectedId, onPick) {
+    const list = document.getElementById("ranked-list");
+    list.innerHTML = "";
+    const sorted = [...INJURY_DATA].sort((a, b) => b.count - a.count);
+    sorted.forEach((d, i) => {
+      const row = document.createElement("div");
+      row.className = "rank-row" + (d.id === selectedId ? " selected" : "");
+      row.innerHTML = `
+        <span class="idx">${i + 1}</span>
+        <span class="swatch" style="background:${thermalColor(d.count / maxCount).css}"></span>
+        <span class="name">${d.label}</span>
+        <span class="val">${d.count}</span>
+      `;
+      row.addEventListener("click", () => onPick(d.id));
+      list.appendChild(row);
+    });
+  }
+
+  function renderSelected(id) {
+    const el = document.getElementById("selected-region");
+    const d = id ? dataById[id] : null;
+    if (!d) {
+      el.innerHTML = `<span class="empty">Hover or click a body region on the model</span>`;
+      return;
+    }
+    el.innerHTML = `
+      <span class="name">${d.label}</span>
+      <span class="count" style="color:${thermalColor(d.count / maxCount).css}">${d.count}</span>
+      <span class="unit">injuries</span>
+    `;
+  }
+
+  // ---------------- three.js setup ----------------
+  const mount = document.getElementById("canvas-mount");
+  const width = mount.clientWidth;
+  const height = mount.clientHeight;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  camera.position.set(0, 1.8, 4.6);
+  camera.lookAt(0, 0.6, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  mount.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(3, 5, 4);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+  fill.position.set(-3, 2, -4);
+  scene.add(fill);
+
+  const { group, interactive } = buildFigure();
+  scene.add(group);
+
+  const partToData = {};
+  interactive.forEach(m => { partToData[m.userData.part] = dataByPart[m.userData.part]; });
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+  const state = {
+    autoRotate: true,
+    dragging: false,
+    lastX: 0, lastY: 0,
+    rotY: 0.4, rotX: 0,
+    hoveredMesh: null,
+    selectedMesh: null,
+    selectedId: null,
+  };
+
+  function setMeshHighlight(mesh, active) {
+    if (!mesh) return;
+    mesh.material.emissive.setHex(active ? mesh.userData.baseColor : 0x000000);
+    mesh.material.emissiveIntensity = active ? 0.55 : 0;
+  }
+
+  function updatePointer(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function pickMesh() {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(interactive, false);
+    return hits.length ? hits[0].object : null;
+  }
+
+  function selectById(id) {
+    const mesh = interactive.find(m => partToData[m.userData.part].id === id);
+    if (!mesh) return;
+    if (state.selectedMesh && state.selectedMesh !== mesh) {
+      setMeshHighlight(state.selectedMesh, state.selectedMesh === state.hoveredMesh);
+    }
+    state.selectedMesh = mesh;
+    state.selectedId = id;
+    setMeshHighlight(mesh, true);
+    renderSelected(id);
+    renderRankedList(id, selectById);
+  }
+
+  mount.addEventListener("pointerdown", (e) => {
+    state.dragging = true;
+    mount.classList.add("dragging");
+    state.autoRotate = false;
+    document.getElementById("btn-autorotate").classList.remove("active");
+    document.getElementById("btn-autorotate").textContent = "▶ Auto-rotate";
+    state.lastX = e.clientX;
+    state.lastY = e.clientY;
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (state.dragging) {
+      const dx = e.clientX - state.lastX;
+      const dy = e.clientY - state.lastY;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      state.rotY += dx * 0.01;
+      state.rotX = Math.max(-0.6, Math.min(0.6, state.rotX + dy * 0.01));
+    } else {
+      updatePointer(e.clientX, e.clientY);
+      const mesh = pickMesh();
+      if (mesh !== state.hoveredMesh) {
+        setMeshHighlight(state.hoveredMesh, state.hoveredMesh === state.selectedMesh);
+        state.hoveredMesh = mesh;
+        setMeshHighlight(mesh, true);
+        renderSelected(mesh ? partToData[mesh.userData.part].id : state.selectedId);
+      }
+    }
+  });
+
+  window.addEventListener("pointerup", (e) => {
+    const moved = Math.abs(e.clientX - state.lastX) + Math.abs(e.clientY - state.lastY);
+    state.dragging = false;
+    mount.classList.remove("dragging");
+    if (moved < 3) {
+      updatePointer(e.clientX, e.clientY);
+      const mesh = pickMesh();
+      if (mesh) selectById(partToData[mesh.userData.part].id);
+    }
+  });
+
+  document.getElementById("btn-autorotate").addEventListener("click", () => {
+    state.autoRotate = !state.autoRotate;
+    const btn = document.getElementById("btn-autorotate");
+    btn.classList.toggle("active", state.autoRotate);
+    btn.textContent = state.autoRotate ? "⏸ Pause spin" : "▶ Auto-rotate";
+  });
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    state.rotY = 0.4;
+    state.rotX = 0;
+  });
+
+  function animate() {
+    if (state.autoRotate) state.rotY += 0.006;
+    group.rotation.set(state.rotX, state.rotY, 0);
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener("resize", () => {
+    const w = mount.clientWidth, h = mount.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  renderLegend();
+  renderRankedList(null, selectById);
+  renderSelected(null);
+</script>
+</body>
+</html>
