@@ -7,9 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
+    margin: 0; padding: 0; height: 100%;
     background: #0a0d10;
     font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
     color: #e8ece8;
@@ -24,6 +22,28 @@
     font-family: ui-monospace, Menlo, monospace;
     letter-spacing: 1.5px; font-size: 11px;
     color: #7c8891; text-transform: uppercase;
+  }
+  /* Multiple Body Parts card (top-right of viewport) */
+  #multi-card {
+    position: absolute; top: 14px; right: 18px; z-index: 3;
+    background: #161c20; border: 1px solid #2a333a;
+    border-radius: 8px; padding: 10px 14px;
+    min-width: 150px;
+    font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #multi-card .label {
+    font-size: 10.5px; letter-spacing: 1.4px;
+    color: #7c8891; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  #multi-card .value {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 26px; font-weight: 700;
+    color: #e8ece8; line-height: 1;
+  }
+  #multi-card .sub {
+    font-size: 10.5px; color: #7c8891; margin-top: 3px;
   }
   .controls {
     position: absolute; bottom: 14px; left: 18px;
@@ -87,6 +107,11 @@
 <div id="app">
   <div id="viewport">
     <div class="label-top">Injury Density — Interactive Model</div>
+    <div id="multi-card">
+      <div class="label">Multiple Body Parts</div>
+      <div class="value" id="multi-value">0</div>
+      <div class="sub">injuries reported</div>
+    </div>
     <div id="canvas-mount"></div>
     <div class="controls">
       <button class="btn active" id="btn-autorotate">⏸ Pause spin</button>
@@ -112,9 +137,8 @@
 </div>
 <script>
   // -------------------------------------------------------------------
-  // INJURY DATA — placeholder counts. Swap these values (or wire to
-  // Power BI later) using the exact `part` keys used in buildFigure().
-  // "multiple" has no `part` on purpose (no single 3D region).
+  // INJURY DATA — placeholders. Wire to Power BI later.
+  // "multiple" is intentionally isolated (no `part`, its own card).
   // -------------------------------------------------------------------
   const INJURY_DATA = [
     { id: "abdomen",     label: "Abdomen",             count: 8,  part: "abdomen"  },
@@ -130,11 +154,12 @@
     { id: "shoulder",    label: "Shoulder",            count: 19, part: "shoulder" },
   ];
 
-  const maxCount = Math.max(...INJURY_DATA.map(d => d.count));
-  const dataByPart = Object.fromEntries(
-    INJURY_DATA.filter(d => d.part).map(d => [d.part, d])
-  );
+  // Everything with a `part` is a mappable region; "multiple" is its own card.
+  const MAPPABLE = INJURY_DATA.filter(d => d.part);
+  const maxCount = Math.max(...MAPPABLE.map(d => d.count));
+  const dataByPart = Object.fromEntries(MAPPABLE.map(d => [d.part, d]));
   const dataById = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
+  const multipleData = INJURY_DATA.find(d => d.id === "multiple");
 
   // ---------------- color gradient: light grey -> dark red ----------------
   function heatColor(t) {
@@ -147,14 +172,12 @@
     return { css: `rgb(${r},${g},${b})`, hex: (r << 16) | (g << 8) | b };
   }
 
-  const NEUTRAL_COLOR = 0x3a4048; // used for non-tracked filler pieces (hip, etc.)
+  const NEUTRAL_COLOR = 0x3a4048;
 
-  // ---------------- build the humanoid ----------------
-  // Coordinates chosen so the figure is centered around y = 0
-  // (top of head ~ +2.05, bottom of feet ~ -2.30). No group offset needed.
+  // ---------------- humanoid built from primitives ----------------
   function buildFigure() {
     const group = new THREE.Group();
-    const partToMeshes = {}; // part id -> [meshes]
+    const partToMeshes = {};
 
     function trackedMesh(part, geo, pos, rot) {
       const d = dataByPart[part];
@@ -186,82 +209,62 @@
       return mesh;
     }
 
-    // ---------- head + eyes ----------
-    // Head (slightly ovoid via scale)
+    // head + eyes
     const head = neutralMesh(new THREE.SphereGeometry(0.4, 28, 28), [0, 2.05, 0], null, 0x4a5058);
     head.scale.set(0.95, 1.1, 0.95);
-
-    // Eyes — small dark spheres, tracked as "eyes" region
     trackedMesh("eyes", new THREE.SphereGeometry(0.07, 14, 14), [-0.14, 2.12, 0.34]);
     trackedMesh("eyes", new THREE.SphereGeometry(0.07, 14, 14), [ 0.14, 2.12, 0.34]);
 
-    // ---------- neck ----------
+    // neck
     trackedMesh("neck", new THREE.CylinderGeometry(0.14, 0.16, 0.28, 20), [0, 1.60, 0]);
 
-    // ---------- shoulders ----------
+    // shoulders
     trackedMesh("shoulder", new THREE.SphereGeometry(0.22, 20, 20), [-0.56, 1.32, 0]);
     trackedMesh("shoulder", new THREE.SphereGeometry(0.22, 20, 20), [ 0.56, 1.32, 0]);
 
-    // ---------- torso: abdomen (front) + back (rear) ----------
-    // Two half-boxes stacked in Z to separate front vs back.
-    // Slight X taper via scale to hint at a rib cage silhouette.
+    // torso: abdomen (front) + back (rear)
     const torsoW = 0.9, torsoH = 1.35, halfDepth = 0.22;
+    trackedMesh("abdomen", new THREE.BoxGeometry(torsoW, torsoH, halfDepth), [0, 0.72,  halfDepth / 2]);
+    trackedMesh("back",    new THREE.BoxGeometry(torsoW, torsoH, halfDepth), [0, 0.72, -halfDepth / 2]);
+    neutralMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.18, 24), [0, 1.30, 0], null, 0x4a5058);
 
-    const abdomen = trackedMesh("abdomen",
-      new THREE.BoxGeometry(torsoW, torsoH, halfDepth),
-      [0, 0.72,  halfDepth / 2]);
-    abdomen.scale.set(1, 1, 1);
+    // hips (not in region list)
+    neutralMesh(new THREE.BoxGeometry(0.85, 0.32, 0.5), [0, -0.10, 0], null, 0x4a5058);
 
-    const back = trackedMesh("back",
-      new THREE.BoxGeometry(torsoW, torsoH, halfDepth),
-      [0, 0.72, -halfDepth / 2]);
-    back.scale.set(1, 1, 1);
-
-    // Small rounded chest/collar cap so the shoulders don't look detached
-    neutralMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.18, 24),
-      [0, 1.30, 0], null, 0x4a5058);
-
-    // ---------- hips (neutral, no region in the source list) ----------
-    neutralMesh(new THREE.BoxGeometry(0.85, 0.32, 0.5),
-      [0, -0.10, 0], null, 0x4a5058);
-
-    // ---------- arms (arm/elbow region covers upper arm + elbow + forearm) ----------
-    // Left
+    // arms (arm/elbow region)
     trackedMesh("arm", new THREE.CylinderGeometry(0.13, 0.115, 0.72, 16), [-0.72, 0.85, 0]);
-    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),              [-0.72, 0.45, 0]);
-    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),   [-0.72, 0.06, 0]);
-    // Right
+    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),             [-0.72, 0.45, 0]);
+    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),  [-0.72, 0.06, 0]);
     trackedMesh("arm", new THREE.CylinderGeometry(0.13, 0.115, 0.72, 16), [ 0.72, 0.85, 0]);
-    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),              [ 0.72, 0.45, 0]);
-    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),   [ 0.72, 0.06, 0]);
+    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),             [ 0.72, 0.45, 0]);
+    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),  [ 0.72, 0.06, 0]);
 
-    // ---------- hands ----------
-    // Slightly flattened spheres to hint at palms
+    // hands
     const handL = trackedMesh("hand", new THREE.SphereGeometry(0.14, 18, 18), [-0.72, -0.34, 0]);
     handL.scale.set(0.8, 1.3, 0.55);
     const handR = trackedMesh("hand", new THREE.SphereGeometry(0.14, 18, 18), [ 0.72, -0.34, 0]);
     handR.scale.set(0.8, 1.3, 0.55);
 
-    // ---------- legs upper (thigh + knee) ----------
+    // legs upper (thigh + knee)
     trackedMesh("legUpper", new THREE.CylinderGeometry(0.2, 0.17, 0.9, 18), [-0.24, -0.80, 0]);
-    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),          [-0.24, -1.30, 0]);
+    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),         [-0.24, -1.30, 0]);
     trackedMesh("legUpper", new THREE.CylinderGeometry(0.2, 0.17, 0.9, 18), [ 0.24, -0.80, 0]);
-    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),          [ 0.24, -1.30, 0]);
+    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),         [ 0.24, -1.30, 0]);
 
-    // ---------- legs lower (shin) ----------
+    // legs lower (shin)
     trackedMesh("legLower", new THREE.CylinderGeometry(0.15, 0.11, 0.9, 16), [-0.24, -1.80, 0]);
     trackedMesh("legLower", new THREE.CylinderGeometry(0.15, 0.11, 0.9, 16), [ 0.24, -1.80, 0]);
 
-    // ---------- ankles + feet ----------
+    // ankles + feet
     trackedMesh("ankle", new THREE.SphereGeometry(0.13, 16, 16), [-0.24, -2.28, 0]);
     trackedMesh("ankle", new THREE.SphereGeometry(0.13, 16, 16), [ 0.24, -2.28, 0]);
-    const footL = trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [-0.24, -2.32, 0.12]);
-    const footR = trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [ 0.24, -2.32, 0.12]);
+    trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [-0.24, -2.32, 0.12]);
+    trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [ 0.24, -2.32, 0.12]);
 
     return { group, partToMeshes };
   }
 
-  // ---------------- side panel rendering (plain DOM) ----------------
+  // ---------------- side panel rendering ----------------
   function renderLegend() {
     const bar = document.getElementById("legend-bar");
     bar.innerHTML = "";
@@ -277,14 +280,14 @@
   function renderRankedList(selectedId, onPick) {
     const list = document.getElementById("ranked-list");
     list.innerHTML = "";
-    const sorted = [...INJURY_DATA].sort((a, b) => b.count - a.count);
+    // Exclude "multiple" from the ranked list — it lives on the card
+    const sorted = MAPPABLE.slice().sort((a, b) => b.count - a.count);
     sorted.forEach((d, i) => {
       const row = document.createElement("div");
       row.className = "rank-row" + (d.id === selectedId ? " selected" : "");
-      const swatchColor = d.part ? heatColor(d.count / maxCount).css : "#57626a";
       row.innerHTML = `
         <span class="idx">${i + 1}</span>
-        <span class="swatch" style="background:${swatchColor}"></span>
+        <span class="swatch" style="background:${heatColor(d.count / maxCount).css}"></span>
         <span class="name">${d.label}</span>
         <span class="val">${d.count}</span>
       `;
@@ -296,16 +299,21 @@
   function renderSelected(id) {
     const el = document.getElementById("selected-region");
     const d = id ? dataById[id] : null;
-    if (!d) {
+    if (!d || !d.part) {
       el.innerHTML = `<span class="empty">Hover or click a body region on the model</span>`;
       return;
     }
-    const color = d.part ? heatColor(d.count / maxCount).css : "#c8cdd0";
+    const color = heatColor(d.count / maxCount).css;
     el.innerHTML = `
       <span class="name">${d.label}</span>
       <span class="count" style="color:${color}">${d.count}</span>
       <span class="unit">injuries</span>
     `;
+  }
+
+  function renderMultipleCard() {
+    document.getElementById("multi-value").textContent =
+      multipleData ? multipleData.count : 0;
   }
 
   // ---------------- three.js setup ----------------
@@ -325,16 +333,13 @@
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const key = new THREE.DirectionalLight(0xffffff, 1.0);
-  key.position.set(3, 5, 4);
-  scene.add(key);
+  key.position.set(3, 5, 4); scene.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, 0.35);
-  fill.position.set(-3, 2, -4);
-  scene.add(fill);
+  fill.position.set(-3, 2, -4); scene.add(fill);
 
   const { group, partToMeshes } = buildFigure();
   scene.add(group);
 
-  // flat list of all tracked meshes for raycasting
   const interactive = [];
   Object.values(partToMeshes).forEach(arr => arr.forEach(m => interactive.push(m)));
 
@@ -342,14 +347,10 @@
   const pointer = new THREE.Vector2();
 
   const state = {
-    autoRotate: true,
-    dragging: false,
-    lastX: 0, lastY: 0,
-    downX: 0, downY: 0,
+    autoRotate: true, dragging: false,
+    lastX: 0, lastY: 0, downX: 0, downY: 0,
     rotY: 0.4, rotX: 0,
-    hoveredPart: null,
-    selectedPart: null,
-    selectedId: null,
+    hoveredPart: null, selectedPart: null, selectedId: null,
   };
 
   function setPartHighlight(part, active) {
@@ -374,16 +375,13 @@
 
   function selectById(id) {
     const d = dataById[id];
-    if (!d) return;
-
-    // clear previous selection highlight (unless it's also the hovered part)
+    if (!d || !d.part) return;
     if (state.selectedPart && state.selectedPart !== d.part) {
       setPartHighlight(state.selectedPart, state.selectedPart === state.hoveredPart);
     }
     state.selectedId = id;
-    state.selectedPart = d.part; // may be null (Multiple Body Parts)
-    if (d.part) setPartHighlight(d.part, true);
-
+    state.selectedPart = d.part;
+    setPartHighlight(d.part, true);
     renderSelected(id);
     renderRankedList(id, selectById);
   }
@@ -395,39 +393,29 @@
     const btn = document.getElementById("btn-autorotate");
     btn.classList.remove("active");
     btn.textContent = "▶ Auto-rotate";
-    state.lastX = e.clientX;
-    state.lastY = e.clientY;
-    state.downX = e.clientX;
-    state.downY = e.clientY;
+    state.lastX = e.clientX; state.lastY = e.clientY;
+    state.downX = e.clientX; state.downY = e.clientY;
   });
 
   window.addEventListener("pointermove", (e) => {
     if (state.dragging) {
       const dx = e.clientX - state.lastX;
       const dy = e.clientY - state.lastY;
-      state.lastX = e.clientX;
-      state.lastY = e.clientY;
+      state.lastX = e.clientX; state.lastY = e.clientY;
       state.rotY += dx * 0.01;
       state.rotX = Math.max(-0.6, Math.min(0.6, state.rotX + dy * 0.01));
     } else {
       updatePointer(e.clientX, e.clientY);
       const part = pickPart();
       if (part !== state.hoveredPart) {
-        // clear old hover unless it was the selected part
         if (state.hoveredPart && state.hoveredPart !== state.selectedPart) {
           setPartHighlight(state.hoveredPart, false);
         }
         state.hoveredPart = part;
         if (part) setPartHighlight(part, true);
-
-        // preview label
-        if (part && dataByPart[part]) {
-          renderSelected(dataByPart[part].id);
-        } else if (state.selectedId) {
-          renderSelected(state.selectedId);
-        } else {
-          renderSelected(null);
-        }
+        if (part && dataByPart[part]) renderSelected(dataByPart[part].id);
+        else if (state.selectedId) renderSelected(state.selectedId);
+        else renderSelected(null);
       }
     }
   });
@@ -451,8 +439,7 @@
   });
 
   document.getElementById("btn-reset").addEventListener("click", () => {
-    state.rotY = 0.4;
-    state.rotX = 0;
+    state.rotY = 0.4; state.rotX = 0;
   });
 
   function animate() {
@@ -473,6 +460,7 @@
   renderLegend();
   renderRankedList(null, selectById);
   renderSelected(null);
+  renderMultipleCard();
 </script>
 </body>
 </html>
