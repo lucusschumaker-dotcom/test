@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Injury Density — Interactive 3D Model</title>
+<title>Injury Density — Anatomical Mannequin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -14,8 +15,7 @@
   }
   #app { display: flex; width: 100%; height: 100vh; overflow: hidden; }
   #viewport { flex: 1 1 60%; position: relative; }
-  #canvas-mount { width: 100%; height: 100%; cursor: grab; }
-  #canvas-mount.dragging { cursor: grabbing; }
+  #canvas-mount { width: 100%; height: 100%; }
   #canvas-mount canvas { display: block; }
   .label-top {
     position: absolute; top: 14px; left: 18px; z-index: 2;
@@ -23,39 +23,22 @@
     letter-spacing: 1.5px; font-size: 11px;
     color: #7c8891; text-transform: uppercase;
   }
-  /* Multiple Body Parts card (top-right of viewport) */
   #multi-card {
     position: absolute; top: 14px; right: 18px; z-index: 3;
     background: #161c20; border: 1px solid #2a333a;
     border-radius: 8px; padding: 10px 14px;
     min-width: 150px;
-    font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35);
   }
   #multi-card .label {
     font-size: 10.5px; letter-spacing: 1.4px;
-    color: #7c8891; text-transform: uppercase;
-    margin-bottom: 4px;
+    color: #7c8891; text-transform: uppercase; margin-bottom: 4px;
   }
   #multi-card .value {
     font-family: ui-monospace, Menlo, monospace;
-    font-size: 26px; font-weight: 700;
-    color: #e8ece8; line-height: 1;
+    font-size: 26px; font-weight: 700; color: #e8ece8; line-height: 1;
   }
-  #multi-card .sub {
-    font-size: 10.5px; color: #7c8891; margin-top: 3px;
-  }
-  .controls {
-    position: absolute; bottom: 14px; left: 18px;
-    display: flex; gap: 8px; z-index: 2;
-  }
-  .btn {
-    background: #161c20; color: #c8cdd0;
-    border: 1px solid #2a333a; border-radius: 6px;
-    padding: 6px 12px; font-size: 12px; cursor: pointer;
-    font-family: ui-monospace, Menlo, monospace;
-  }
-  .btn.active { background: #c6ff3d; color: #0a0d10; }
+  #multi-card .sub { font-size: 10.5px; color: #7c8891; margin-top: 3px; }
   .hint {
     position: absolute; bottom: 14px; right: 18px;
     font-size: 10.5px; color: #57626a;
@@ -63,17 +46,13 @@
   }
   #panel {
     flex: 1 1 40%;
-    border-left: 1px solid #1c2226;
-    background: #0d1114;
-    padding: 18px 20px;
-    display: flex; flex-direction: column;
-    gap: 16px; min-width: 280px;
-    box-sizing: border-box; overflow: hidden;
+    border-left: 1px solid #1c2226; background: #0d1114;
+    padding: 18px 20px; display: flex; flex-direction: column;
+    gap: 16px; min-width: 280px; box-sizing: border-box; overflow: hidden;
   }
   .section-label {
     font-size: 11px; letter-spacing: 1.5px;
-    color: #7c8891; text-transform: uppercase;
-    margin-bottom: 8px;
+    color: #7c8891; text-transform: uppercase; margin-bottom: 8px;
   }
   #selected-region { display: flex; align-items: baseline; gap: 10px; }
   #selected-region .empty { font-size: 14px; color: #5a656d; }
@@ -106,23 +85,19 @@
 <body>
 <div id="app">
   <div id="viewport">
-    <div class="label-top">Injury Density — Interactive Model</div>
+    <div class="label-top">Injury Density — Anatomical Mannequin</div>
     <div id="multi-card">
       <div class="label">Multiple Body Parts</div>
       <div class="value" id="multi-value">0</div>
       <div class="sub">injuries reported</div>
     </div>
     <div id="canvas-mount"></div>
-    <div class="controls">
-      <button class="btn active" id="btn-autorotate">⏸ Pause spin</button>
-      <button class="btn" id="btn-reset">⟲ Reset view</button>
-    </div>
-    <div class="hint">drag to rotate · click a region for detail</div>
+    <div class="hint">drag to rotate · scroll to zoom · click a web to select</div>
   </div>
   <div id="panel">
     <div>
       <div class="section-label">Selected region</div>
-      <div id="selected-region"><span class="empty">Hover or click a body region on the model</span></div>
+      <div id="selected-region"><span class="empty">Hover or click an injury web on the model</span></div>
     </div>
     <div>
       <div class="section-label">Scale</div>
@@ -135,11 +110,11 @@
     </div>
   </div>
 </div>
+
 <script>
-  // -------------------------------------------------------------------
-  // INJURY DATA — placeholders. Wire to Power BI later.
-  // "multiple" is intentionally isolated (no `part`, its own card).
-  // -------------------------------------------------------------------
+  // =====================================================================
+  // INJURY DATA (placeholder — wire to Power BI later)
+  // =====================================================================
   const INJURY_DATA = [
     { id: "abdomen",     label: "Abdomen",             count: 8,  part: "abdomen"  },
     { id: "ankle",       label: "Ankle",               count: 15, part: "ankle"    },
@@ -154,153 +129,413 @@
     { id: "shoulder",    label: "Shoulder",            count: 19, part: "shoulder" },
   ];
 
-  // Everything with a `part` is a mappable region; "multiple" is its own card.
   const MAPPABLE = INJURY_DATA.filter(d => d.part);
   const maxCount = Math.max(...MAPPABLE.map(d => d.count));
   const dataByPart = Object.fromEntries(MAPPABLE.map(d => [d.part, d]));
-  const dataById = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
+  const dataById   = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
   const multipleData = INJURY_DATA.find(d => d.id === "multiple");
 
-  // ---------------- color gradient: light grey -> dark red ----------------
+  // =====================================================================
+  // COLOR RAMP: light grey -> dark red
+  // =====================================================================
   function heatColor(t) {
     t = Math.max(0, Math.min(1, t));
-    const start = [211, 211, 211]; // #D3D3D3
-    const end   = [139,   0,   0]; // #8B0000
+    const start = [211, 211, 211], end = [139, 0, 0];
     const r = Math.round(start[0] + (end[0] - start[0]) * t);
     const g = Math.round(start[1] + (end[1] - start[1]) * t);
     const b = Math.round(start[2] + (end[2] - start[2]) * t);
     return { css: `rgb(${r},${g},${b})`, hex: (r << 16) | (g << 8) | b };
   }
 
-  const NEUTRAL_COLOR = 0x3a4048;
+  // =====================================================================
+  // THREE.JS SETUP
+  // =====================================================================
+  const mount = document.getElementById('canvas-mount');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0d10);
 
-  // ---------------- humanoid built from primitives ----------------
-  function buildFigure() {
-    const group = new THREE.Group();
-    const partToMeshes = {};
+  const camera = new THREE.PerspectiveCamera(35, mount.clientWidth / mount.clientHeight, 0.1, 100);
+  camera.position.set(0, 0.2, 6.2);
 
-    function trackedMesh(part, geo, pos, rot) {
-      const d = dataByPart[part];
-      const t = d ? d.count / maxCount : 0;
-      const color = d ? heatColor(t).hex : NEUTRAL_COLOR;
-      const mat = new THREE.MeshStandardMaterial({
-        color, roughness: 0.5, metalness: 0.05,
-        emissive: 0x000000, emissiveIntensity: 0,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(...pos);
-      if (rot) mesh.rotation.set(...rot);
-      mesh.userData.part = part;
-      mesh.userData.baseColor = color;
-      group.add(mesh);
-      if (!partToMeshes[part]) partToMeshes[part] = [];
-      partToMeshes[part].push(mesh);
-      return mesh;
-    }
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(mount.clientWidth, mount.clientHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = false;
+  mount.appendChild(renderer.domElement);
 
-    function neutralMesh(geo, pos, rot, color) {
-      const mat = new THREE.MeshStandardMaterial({
-        color: color ?? NEUTRAL_COLOR, roughness: 0.6, metalness: 0.05,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(...pos);
-      if (rot) mesh.rotation.set(...rot);
-      group.add(mesh);
-      return mesh;
-    }
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.target.set(0, 0.0, 0);
+  controls.minDistance = 2.5;
+  controls.maxDistance = 12;
 
-    // head + eyes
-    const head = neutralMesh(new THREE.SphereGeometry(0.4, 28, 28), [0, 2.05, 0], null, 0x4a5058);
-    head.scale.set(0.95, 1.1, 0.95);
-    trackedMesh("eyes", new THREE.SphereGeometry(0.07, 14, 14), [-0.14, 2.12, 0.34]);
-    trackedMesh("eyes", new THREE.SphereGeometry(0.07, 14, 14), [ 0.14, 2.12, 0.34]);
+  // Lighting rig — key + fill + rim for that dramatic dashboard silhouette
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  key.position.set(4, 6, 5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xa8b5c4, 0.35);
+  fill.position.set(-4, 2, 3); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.55);
+  rim.position.set(0, 3, -6); scene.add(rim);
 
-    // neck
-    trackedMesh("neck", new THREE.CylinderGeometry(0.14, 0.16, 0.28, 20), [0, 1.60, 0]);
+  // =====================================================================
+  // MATERIALS — matte medical mannequin
+  // =====================================================================
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: 0xd6d6d6, roughness: 0.72, metalness: 0.04,
+  });
+  const jointMat = new THREE.MeshStandardMaterial({
+    color: 0xb8b8b8, roughness: 0.55, metalness: 0.08,
+  });
 
-    // shoulders
-    trackedMesh("shoulder", new THREE.SphereGeometry(0.22, 20, 20), [-0.56, 1.32, 0]);
-    trackedMesh("shoulder", new THREE.SphereGeometry(0.22, 20, 20), [ 0.56, 1.32, 0]);
+  // =====================================================================
+  // MANNEQUIN — procedural, no external assets
+  // Every anchor position is defined in the mannequin's local space,
+  // so the whole thing sways as one.
+  // =====================================================================
+  const mannequin = new THREE.Group();
+  scene.add(mannequin);
 
-    // torso: abdomen (front) + back (rear)
-    const torsoW = 0.9, torsoH = 1.35, halfDepth = 0.22;
-    trackedMesh("abdomen", new THREE.BoxGeometry(torsoW, torsoH, halfDepth), [0, 0.72,  halfDepth / 2]);
-    trackedMesh("back",    new THREE.BoxGeometry(torsoW, torsoH, halfDepth), [0, 0.72, -halfDepth / 2]);
-    neutralMesh(new THREE.CylinderGeometry(0.42, 0.42, 0.18, 24), [0, 1.30, 0], null, 0x4a5058);
-
-    // hips (not in region list)
-    neutralMesh(new THREE.BoxGeometry(0.85, 0.32, 0.5), [0, -0.10, 0], null, 0x4a5058);
-
-    // arms (arm/elbow region)
-    trackedMesh("arm", new THREE.CylinderGeometry(0.13, 0.115, 0.72, 16), [-0.72, 0.85, 0]);
-    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),             [-0.72, 0.45, 0]);
-    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),  [-0.72, 0.06, 0]);
-    trackedMesh("arm", new THREE.CylinderGeometry(0.13, 0.115, 0.72, 16), [ 0.72, 0.85, 0]);
-    trackedMesh("arm", new THREE.SphereGeometry(0.14, 16, 16),             [ 0.72, 0.45, 0]);
-    trackedMesh("arm", new THREE.CylinderGeometry(0.11, 0.09, 0.68, 16),  [ 0.72, 0.06, 0]);
-
-    // hands
-    const handL = trackedMesh("hand", new THREE.SphereGeometry(0.14, 18, 18), [-0.72, -0.34, 0]);
-    handL.scale.set(0.8, 1.3, 0.55);
-    const handR = trackedMesh("hand", new THREE.SphereGeometry(0.14, 18, 18), [ 0.72, -0.34, 0]);
-    handR.scale.set(0.8, 1.3, 0.55);
-
-    // legs upper (thigh + knee)
-    trackedMesh("legUpper", new THREE.CylinderGeometry(0.2, 0.17, 0.9, 18), [-0.24, -0.80, 0]);
-    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),         [-0.24, -1.30, 0]);
-    trackedMesh("legUpper", new THREE.CylinderGeometry(0.2, 0.17, 0.9, 18), [ 0.24, -0.80, 0]);
-    trackedMesh("legUpper", new THREE.SphereGeometry(0.18, 18, 18),         [ 0.24, -1.30, 0]);
-
-    // legs lower (shin)
-    trackedMesh("legLower", new THREE.CylinderGeometry(0.15, 0.11, 0.9, 16), [-0.24, -1.80, 0]);
-    trackedMesh("legLower", new THREE.CylinderGeometry(0.15, 0.11, 0.9, 16), [ 0.24, -1.80, 0]);
-
-    // ankles + feet
-    trackedMesh("ankle", new THREE.SphereGeometry(0.13, 16, 16), [-0.24, -2.28, 0]);
-    trackedMesh("ankle", new THREE.SphereGeometry(0.13, 16, 16), [ 0.24, -2.28, 0]);
-    trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [-0.24, -2.32, 0.12]);
-    trackedMesh("ankle", new THREE.BoxGeometry(0.22, 0.12, 0.42), [ 0.24, -2.32, 0.12]);
-
-    return { group, partToMeshes };
+  function addMesh(geo, mat, pos, rot, scl, parent = mannequin) {
+    const m = new THREE.Mesh(geo, mat);
+    if (pos) m.position.set(...pos);
+    if (rot) m.rotation.set(...rot);
+    if (scl) m.scale.set(...scl);
+    parent.add(m);
+    return m;
   }
 
-  // ---------------- side panel rendering ----------------
+  // ---------- HEAD (LatheGeometry — smooth egg) ----------
+  {
+    const pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24;
+      const angle = t * Math.PI;
+      const r = Math.sin(angle) * 0.20;
+      const y = -Math.cos(angle) * 0.24;
+      pts.push(new THREE.Vector2(r, y));
+    }
+    const headGeo = new THREE.LatheGeometry(pts, 32);
+    addMesh(headGeo, skinMat, [0, 1.80, 0]);
+  }
+
+  // ---------- NECK (tapered cylinder) ----------
+  addMesh(new THREE.CylinderGeometry(0.10, 0.13, 0.22, 24), skinMat, [0, 1.47, 0]);
+
+  // ---------- TORSO (LatheGeometry — anatomical silhouette) ----------
+  {
+    const torsoPts = [
+      new THREE.Vector2(0.05, 0.00),
+      new THREE.Vector2(0.24, 0.02),
+      new THREE.Vector2(0.28, 0.15),   // waist narrow
+      new THREE.Vector2(0.32, 0.32),   // lower ribs
+      new THREE.Vector2(0.38, 0.55),   // chest widening
+      new THREE.Vector2(0.40, 0.72),   // upper chest
+      new THREE.Vector2(0.34, 0.86),   // shoulder line
+      new THREE.Vector2(0.18, 0.94),
+      new THREE.Vector2(0.02, 1.00),
+    ];
+    const torsoGeo = new THREE.LatheGeometry(torsoPts, 40);
+    addMesh(torsoGeo, skinMat, [0, 0.42, 0]);
+  }
+
+  // ---------- PELVIS / HIPS (LatheGeometry) ----------
+  {
+    const hipPts = [
+      new THREE.Vector2(0.02, 0.00),
+      new THREE.Vector2(0.24, 0.02),
+      new THREE.Vector2(0.32, 0.10),
+      new THREE.Vector2(0.34, 0.22),
+      new THREE.Vector2(0.30, 0.32),
+      new THREE.Vector2(0.05, 0.36),
+    ];
+    const hipGeo = new THREE.LatheGeometry(hipPts, 32);
+    addMesh(hipGeo, skinMat, [0, 0.06, 0]);
+  }
+
+  // ---------- BALL JOINTS + LIMBS ----------
+  // Shoulders
+  addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [-0.42, 1.30, 0]);
+  addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [ 0.42, 1.30, 0]);
+
+  // Upper arms (tapered cylinders slightly angled outward)
+  addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [-0.50, 0.99, 0], [0, 0, 0.15]);
+  addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [ 0.50, 0.99, 0], [0, 0, -0.15]);
+
+  // Elbows
+  addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [-0.55, 0.66, 0]);
+  addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [ 0.55, 0.66, 0]);
+
+  // Forearms
+  addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [-0.58, 0.34, 0], [0, 0, 0.06]);
+  addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [ 0.58, 0.34, 0], [0, 0, -0.06]);
+
+  // Wrists
+  addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [-0.60, 0.02, 0]);
+  addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [ 0.60, 0.02, 0]);
+
+  // Hands (flattened ellipsoids)
+  {
+    const handL = addMesh(new THREE.SphereGeometry(0.10, 22, 18), skinMat, [-0.60, -0.12, 0]);
+    handL.scale.set(0.65, 1.35, 0.5);
+    const handR = addMesh(new THREE.SphereGeometry(0.10, 22, 18), skinMat, [ 0.60, -0.12, 0]);
+    handR.scale.set(0.65, 1.35, 0.5);
+  }
+
+  // Hip joints
+  addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [-0.16, -0.05, 0]);
+  addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [ 0.16, -0.05, 0]);
+
+  // Thighs
+  addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [-0.18, -0.44, 0]);
+  addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [ 0.18, -0.44, 0]);
+
+  // Knees
+  addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [-0.18, -0.84, 0]);
+  addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [ 0.18, -0.84, 0]);
+
+  // Shins
+  addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [-0.18, -1.22, 0]);
+  addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [ 0.18, -1.22, 0]);
+
+  // Ankles
+  addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [-0.18, -1.60, 0]);
+  addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [ 0.18, -1.60, 0]);
+
+  // Feet (extruded shape for a proper foot silhouette)
+  {
+    const footShape = new THREE.Shape();
+    footShape.moveTo(-0.06, -0.05);
+    footShape.quadraticCurveTo(-0.10,  0.05, -0.06,  0.24);
+    footShape.quadraticCurveTo( 0.00,  0.32,  0.06,  0.24);
+    footShape.quadraticCurveTo( 0.10,  0.05,  0.06, -0.05);
+    footShape.quadraticCurveTo( 0.00, -0.08, -0.06, -0.05);
+    const footGeo = new THREE.ExtrudeGeometry(footShape, {
+      depth: 0.08, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 3, curveSegments: 24,
+    });
+    const footL = addMesh(footGeo, skinMat, [-0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
+    const footR = addMesh(footGeo, skinMat, [ 0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
+  }
+
+  // Faint disc under the feet (grounding shadow substitute)
+  {
+    const discGeo = new THREE.CircleGeometry(0.9, 48);
+    const discMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = -1.78;
+    mannequin.add(disc);
+  }
+
+  // Center the mannequin on the origin vertically
+  mannequin.position.y = 0.15;
+
+  // =====================================================================
+  // INJURY WEB CAGES (geodesic wireframes floating around each region)
+  // Positions are in mannequin-local space so they sway with the model.
+  // =====================================================================
+  function createWeb(radius, colorHex) {
+    const group = new THREE.Group();
+    const geo = new THREE.IcosahedronGeometry(radius, 1);
+    const shell = new THREE.Mesh(geo,
+      new THREE.MeshBasicMaterial({
+        color: colorHex, transparent: true, opacity: 0.14,
+        depthWrite: false, side: THREE.DoubleSide,
+      }));
+    const edges = new THREE.EdgesGeometry(geo);
+    const lines = new THREE.LineSegments(edges,
+      new THREE.LineBasicMaterial({
+        color: colorHex, transparent: true, opacity: 0.9, linewidth: 1,
+      }));
+    group.add(shell); group.add(lines);
+    group.userData.shell = shell;
+    group.userData.lines = lines;
+    group.userData.baseOpacityShell = 0.14;
+    group.userData.baseOpacityLines = 0.9;
+    return group;
+  }
+
+  const webRegistry = []; // { web, region, id, shell }
+  const shellMeshes = [];
+  const webByRegion = {};
+
+  function registerWeb(web, region) {
+    const d = dataByPart[region];
+    if (!d) return;
+    web.userData.region = region;
+    web.userData.id = d.id;
+    web.userData.shell.userData.parentWeb = web;
+    webRegistry.push({ web, region, id: d.id, shell: web.userData.shell });
+    shellMeshes.push(web.userData.shell);
+    if (!webByRegion[region]) webByRegion[region] = [];
+    webByRegion[region].push(web);
+  }
+
+  // ---------- POINT WEBS (single anchor position) ----------
+  const POINT_WEBS = [
+    // Region        Position (local)             Radius
+    { region: 'eyes',     pos: [-0.08, 1.85, 0.16], radius: 0.06 },
+    { region: 'eyes',     pos: [ 0.08, 1.85, 0.16], radius: 0.06 },
+    { region: 'neck',     pos: [ 0.00, 1.47, 0.00], radius: 0.13 },
+    { region: 'shoulder', pos: [-0.42, 1.30, 0.00], radius: 0.16 },
+    { region: 'shoulder', pos: [ 0.42, 1.30, 0.00], radius: 0.16 },
+    { region: 'abdomen',  pos: [ 0.00, 0.85, 0.15], radius: 0.18 },  // front of torso
+    { region: 'back',     pos: [ 0.00, 0.85,-0.15], radius: 0.18 },  // back of torso
+    { region: 'hand',     pos: [-0.60,-0.14, 0.00], radius: 0.12 },
+    { region: 'hand',     pos: [ 0.60,-0.14, 0.00], radius: 0.12 },
+    { region: 'ankle',    pos: [-0.18,-1.62, 0.02], radius: 0.11 },
+    { region: 'ankle',    pos: [ 0.18,-1.62, 0.02], radius: 0.11 },
+  ];
+
+  POINT_WEBS.forEach(cfg => {
+    const d = dataByPart[cfg.region];
+    if (!d) return;
+    const color = heatColor(d.count / maxCount).hex;
+    const web = createWeb(cfg.radius, color);
+    web.position.set(...cfg.pos);
+    mannequin.add(web);
+    registerWeb(web, cfg.region);
+  });
+
+  // ---------- SEGMENT WEBS (stretched between two points) ----------
+  const SEGMENT_WEBS = [
+    // Region        From (local)            To (local)              Radius
+    { region: 'arm',      from: [-0.48, 1.26, 0], to: [-0.55, 0.68, 0], radius: 0.13 },  // L upper arm
+    { region: 'arm',      from: [-0.55, 0.64, 0], to: [-0.60, 0.06, 0], radius: 0.11 },  // L forearm
+    { region: 'arm',      from: [ 0.48, 1.26, 0], to: [ 0.55, 0.68, 0], radius: 0.13 },  // R upper arm
+    { region: 'arm',      from: [ 0.55, 0.64, 0], to: [ 0.60, 0.06, 0], radius: 0.11 },  // R forearm
+    { region: 'legUpper', from: [-0.16,-0.05, 0], to: [-0.18,-0.82, 0], radius: 0.19 },  // L thigh
+    { region: 'legUpper', from: [ 0.16,-0.05, 0], to: [ 0.18,-0.82, 0], radius: 0.19 },  // R thigh
+    { region: 'legLower', from: [-0.18,-0.86, 0], to: [-0.18,-1.56, 0], radius: 0.14 },  // L shin
+    { region: 'legLower', from: [ 0.18,-0.86, 0], to: [ 0.18,-1.56, 0], radius: 0.14 },  // R shin
+  ];
+
+  const _upVec = new THREE.Vector3(0, 1, 0);
+  SEGMENT_WEBS.forEach(cfg => {
+    const d = dataByPart[cfg.region];
+    if (!d) return;
+    const color = heatColor(d.count / maxCount).hex;
+    const web = createWeb(cfg.radius, color);
+    const from = new THREE.Vector3(...cfg.from);
+    const to   = new THREE.Vector3(...cfg.to);
+    const mid = from.clone().add(to).multiplyScalar(0.5);
+    const dir = to.clone().sub(from);
+    const length = dir.length();
+    dir.normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(_upVec, dir);
+    web.position.copy(mid);
+    web.quaternion.copy(q);
+    web.scale.set(1, (length / (2 * cfg.radius)) * 1.15, 1);
+    web.userData.baseScaleY = web.scale.y;
+    mannequin.add(web);
+    registerWeb(web, cfg.region);
+  });
+
+  // =====================================================================
+  // INTERACTION (raycast against web shells)
+  // =====================================================================
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const state = { hoveredRegion: null, selectedRegion: null, selectedId: null };
+
+  function setRegionHighlight(region, active) {
+    if (!region || !webByRegion[region]) return;
+    webByRegion[region].forEach(web => {
+      web.userData.shell.material.opacity = active ? 0.42 : web.userData.baseOpacityShell;
+      web.userData.lines.material.opacity = active ? 1.0  : web.userData.baseOpacityLines;
+    });
+  }
+
+  function updatePointer(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function pickRegion() {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(shellMeshes, false);
+    return hits.length ? hits[0].object.userData.parentWeb.userData.region : null;
+  }
+
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    updatePointer(e.clientX, e.clientY);
+    const region = pickRegion();
+    if (region !== state.hoveredRegion) {
+      if (state.hoveredRegion && state.hoveredRegion !== state.selectedRegion) {
+        setRegionHighlight(state.hoveredRegion, false);
+      }
+      state.hoveredRegion = region;
+      if (region) setRegionHighlight(region, true);
+      if (region && dataByPart[region]) renderSelected(dataByPart[region].id);
+      else if (state.selectedId) renderSelected(state.selectedId);
+      else renderSelected(null);
+    }
+  });
+
+  let downX = 0, downY = 0;
+  renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    const moved = Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY);
+    if (moved > 4) return;
+    updatePointer(e.clientX, e.clientY);
+    const region = pickRegion();
+    if (region && dataByPart[region]) selectById(dataByPart[region].id);
+  });
+
+  function selectById(id) {
+    const d = dataById[id];
+    if (!d || !d.part) return;
+    if (state.selectedRegion && state.selectedRegion !== d.part) {
+      setRegionHighlight(state.selectedRegion, state.selectedRegion === state.hoveredRegion);
+    }
+    state.selectedId = id;
+    state.selectedRegion = d.part;
+    setRegionHighlight(d.part, true);
+    renderSelected(id);
+    renderRankedList(id, selectById);
+  }
+
+  // =====================================================================
+  // SIDE PANEL
+  // =====================================================================
   function renderLegend() {
-    const bar = document.getElementById("legend-bar");
-    bar.innerHTML = "";
+    const bar = document.getElementById('legend-bar');
+    bar.innerHTML = '';
     for (let i = 0; i < 40; i++) {
-      const seg = document.createElement("div");
+      const seg = document.createElement('div');
       seg.style.background = heatColor(i / 39).css;
       bar.appendChild(seg);
     }
-    document.getElementById("legend-mid").textContent = Math.round(maxCount / 2);
-    document.getElementById("legend-max").textContent = maxCount;
+    document.getElementById('legend-mid').textContent = Math.round(maxCount / 2);
+    document.getElementById('legend-max').textContent = maxCount;
   }
 
   function renderRankedList(selectedId, onPick) {
-    const list = document.getElementById("ranked-list");
-    list.innerHTML = "";
-    // Exclude "multiple" from the ranked list — it lives on the card
+    const list = document.getElementById('ranked-list');
+    list.innerHTML = '';
     const sorted = MAPPABLE.slice().sort((a, b) => b.count - a.count);
     sorted.forEach((d, i) => {
-      const row = document.createElement("div");
-      row.className = "rank-row" + (d.id === selectedId ? " selected" : "");
+      const row = document.createElement('div');
+      row.className = 'rank-row' + (d.id === selectedId ? ' selected' : '');
       row.innerHTML = `
         <span class="idx">${i + 1}</span>
         <span class="swatch" style="background:${heatColor(d.count / maxCount).css}"></span>
         <span class="name">${d.label}</span>
         <span class="val">${d.count}</span>
       `;
-      row.addEventListener("click", () => onPick(d.id));
+      row.addEventListener('click', () => onPick(d.id));
       list.appendChild(row);
     });
   }
 
   function renderSelected(id) {
-    const el = document.getElementById("selected-region");
+    const el = document.getElementById('selected-region');
     const d = id ? dataById[id] : null;
     if (!d || !d.part) {
-      el.innerHTML = `<span class="empty">Hover or click a body region on the model</span>`;
+      el.innerHTML = `<span class="empty">Hover or click an injury web on the model</span>`;
       return;
     }
     const color = heatColor(d.count / maxCount).css;
@@ -312,155 +547,55 @@
   }
 
   function renderMultipleCard() {
-    document.getElementById("multi-value").textContent =
-      multipleData ? multipleData.count : 0;
+    document.getElementById('multi-value').textContent = multipleData ? multipleData.count : 0;
   }
-
-  // ---------------- three.js setup ----------------
-  const mount = document.getElementById("canvas-mount");
-  const width = mount.clientWidth;
-  const height = mount.clientHeight;
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-  camera.position.set(0, 0, 8);
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  mount.appendChild(renderer.domElement);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const key = new THREE.DirectionalLight(0xffffff, 1.0);
-  key.position.set(3, 5, 4); scene.add(key);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
-  fill.position.set(-3, 2, -4); scene.add(fill);
-
-  const { group, partToMeshes } = buildFigure();
-  scene.add(group);
-
-  const interactive = [];
-  Object.values(partToMeshes).forEach(arr => arr.forEach(m => interactive.push(m)));
-
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
-
-  const state = {
-    autoRotate: true, dragging: false,
-    lastX: 0, lastY: 0, downX: 0, downY: 0,
-    rotY: 0.4, rotX: 0,
-    hoveredPart: null, selectedPart: null, selectedId: null,
-  };
-
-  function setPartHighlight(part, active) {
-    if (!part || !partToMeshes[part]) return;
-    partToMeshes[part].forEach(mesh => {
-      mesh.material.emissive.setHex(active ? mesh.userData.baseColor : 0x000000);
-      mesh.material.emissiveIntensity = active ? 0.55 : 0;
-    });
-  }
-
-  function updatePointer(clientX, clientY) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
-  function pickPart() {
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(interactive, false);
-    return hits.length ? hits[0].object.userData.part : null;
-  }
-
-  function selectById(id) {
-    const d = dataById[id];
-    if (!d || !d.part) return;
-    if (state.selectedPart && state.selectedPart !== d.part) {
-      setPartHighlight(state.selectedPart, state.selectedPart === state.hoveredPart);
-    }
-    state.selectedId = id;
-    state.selectedPart = d.part;
-    setPartHighlight(d.part, true);
-    renderSelected(id);
-    renderRankedList(id, selectById);
-  }
-
-  mount.addEventListener("pointerdown", (e) => {
-    state.dragging = true;
-    mount.classList.add("dragging");
-    state.autoRotate = false;
-    const btn = document.getElementById("btn-autorotate");
-    btn.classList.remove("active");
-    btn.textContent = "▶ Auto-rotate";
-    state.lastX = e.clientX; state.lastY = e.clientY;
-    state.downX = e.clientX; state.downY = e.clientY;
-  });
-
-  window.addEventListener("pointermove", (e) => {
-    if (state.dragging) {
-      const dx = e.clientX - state.lastX;
-      const dy = e.clientY - state.lastY;
-      state.lastX = e.clientX; state.lastY = e.clientY;
-      state.rotY += dx * 0.01;
-      state.rotX = Math.max(-0.6, Math.min(0.6, state.rotX + dy * 0.01));
-    } else {
-      updatePointer(e.clientX, e.clientY);
-      const part = pickPart();
-      if (part !== state.hoveredPart) {
-        if (state.hoveredPart && state.hoveredPart !== state.selectedPart) {
-          setPartHighlight(state.hoveredPart, false);
-        }
-        state.hoveredPart = part;
-        if (part) setPartHighlight(part, true);
-        if (part && dataByPart[part]) renderSelected(dataByPart[part].id);
-        else if (state.selectedId) renderSelected(state.selectedId);
-        else renderSelected(null);
-      }
-    }
-  });
-
-  window.addEventListener("pointerup", (e) => {
-    const moved = Math.abs(e.clientX - state.downX) + Math.abs(e.clientY - state.downY);
-    state.dragging = false;
-    mount.classList.remove("dragging");
-    if (moved < 3) {
-      updatePointer(e.clientX, e.clientY);
-      const part = pickPart();
-      if (part && dataByPart[part]) selectById(dataByPart[part].id);
-    }
-  });
-
-  document.getElementById("btn-autorotate").addEventListener("click", () => {
-    state.autoRotate = !state.autoRotate;
-    const btn = document.getElementById("btn-autorotate");
-    btn.classList.toggle("active", state.autoRotate);
-    btn.textContent = state.autoRotate ? "⏸ Pause spin" : "▶ Auto-rotate";
-  });
-
-  document.getElementById("btn-reset").addEventListener("click", () => {
-    state.rotY = 0.4; state.rotX = 0;
-  });
-
-  function animate() {
-    if (state.autoRotate) state.rotY += 0.006;
-    group.rotation.set(state.rotX, state.rotY, 0);
-    renderer.render(scene, camera);
-    requestAnimationFrame(animate);
-  }
-  animate();
-
-  window.addEventListener("resize", () => {
-    const w = mount.clientWidth, h = mount.clientHeight;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
-  });
 
   renderLegend();
   renderRankedList(null, selectById);
   renderSelected(null);
   renderMultipleCard();
+
+  // =====================================================================
+  // ANIMATE — idle sway + web pulse + line flicker
+  // =====================================================================
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    // Subtle idle sway
+    mannequin.rotation.y = Math.sin(t * 0.4) * 0.05;
+    mannequin.position.y = 0.15 + Math.sin(t * 0.8) * 0.015;
+
+    // Web pulse & flicker
+    const pulse = 1 + Math.sin(t * 2) * 0.04;
+    webRegistry.forEach(({ web, region }) => {
+      const isSegment = web.userData.baseScaleY !== undefined;
+      if (isSegment) {
+        web.scale.set(pulse, web.userData.baseScaleY, pulse);
+      } else {
+        web.scale.setScalar(pulse);
+      }
+      const isActive = (region === state.hoveredRegion || region === state.selectedRegion);
+      const targetOpacity = isActive ? 1.0 : 0.82 + Math.sin(t * 3 + region.length) * 0.12;
+      web.userData.lines.material.opacity = targetOpacity;
+    });
+
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // =====================================================================
+  // RESIZE
+  // =====================================================================
+  window.addEventListener('resize', () => {
+    const w = mount.clientWidth, h = mount.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
 </script>
 </body>
 </html>
