@@ -3,107 +3,200 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Injury Density — Anatomical Mannequin</title>
+<title>Injury Density — Interactive 3D Model</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js
 <style>
   html, body {
-    margin: 0; padding: 0; height: 100%;
+    margin: 0;
+    padding: 0;
+    height: 100%;
     background: #0a0d10;
     font-family: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
     color: #e8ece8;
   }
-  #app { display: flex; width: 100%; height: 100vh; overflow: hidden; }
-  #viewport { flex: 1 1 60%; position: relative; }
-  #canvas-mount { width: 100%; height: 100%; }
+  #app {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #viewport {
+    flex: 1 1 60%;
+    position: relative;
+  }
+  #canvas-mount {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #canvas-mount.dragging { cursor: grabbing; }
   #canvas-mount canvas { display: block; }
+
   .label-top {
-    position: absolute; top: 14px; left: 18px; z-index: 2;
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    z-index: 2;
     font-family: ui-monospace, Menlo, monospace;
-    letter-spacing: 1.5px; font-size: 11px;
-    color: #7c8891; text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 11px;
+    color: #7c8891;
+    text-transform: uppercase;
   }
-  #multi-card {
-    position: absolute; top: 14px; right: 18px; z-index: 3;
-    background: #161c20; border: 1px solid #2a333a;
-    border-radius: 8px; padding: 10px 14px;
-    min-width: 150px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  .controls {
+    position: absolute;
+    bottom: 14px;
+    left: 18px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
   }
-  #multi-card .label {
-    font-size: 10.5px; letter-spacing: 1.4px;
-    color: #7c8891; text-transform: uppercase; margin-bottom: 4px;
-  }
-  #multi-card .value {
+  .btn {
+    background: #161c20;
+    color: #c8cdd0;
+    border: 1px solid #2a333a;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
     font-family: ui-monospace, Menlo, monospace;
-    font-size: 26px; font-weight: 700; color: #e8ece8; line-height: 1;
   }
-  #multi-card .sub { font-size: 10.5px; color: #7c8891; margin-top: 3px; }
+  .btn.active {
+    background: #c6ff3d;
+    color: #0a0d10;
+  }
   .hint {
-    position: absolute; bottom: 14px; right: 18px;
-    font-size: 10.5px; color: #57626a;
-    font-family: ui-monospace, Menlo, monospace; z-index: 2;
+    position: absolute;
+    bottom: 14px;
+    right: 18px;
+    font-size: 10.5px;
+    color: #57626a;
+    font-family: ui-monospace, Menlo, monospace;
+    z-index: 2;
   }
+
   #panel {
     flex: 1 1 40%;
-    border-left: 1px solid #1c2226; background: #0d1114;
-    padding: 18px 20px; display: flex; flex-direction: column;
-    gap: 16px; min-width: 280px; box-sizing: border-box; overflow: hidden;
+    border-left: 1px solid #1c2226;
+    background: #0d1114;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 280px;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .section-label {
-    font-size: 11px; letter-spacing: 1.5px;
-    color: #7c8891; text-transform: uppercase; margin-bottom: 8px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: #7c8891;
+    text-transform: uppercase;
+    margin-bottom: 8px;
   }
-  #selected-region { display: flex; align-items: baseline; gap: 10px; }
-  #selected-region .empty { font-size: 14px; color: #5a656d; }
-  #selected-region .name { font-size: 22px; font-weight: 700; }
+  #selected-region {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  #selected-region .empty {
+    font-size: 14px;
+    color: #5a656d;
+  }
+  #selected-region .name {
+    font-size: 22px;
+    font-weight: 700;
+  }
   #selected-region .count {
     font-family: ui-monospace, Menlo, monospace;
-    font-size: 22px; font-weight: 700;
+    font-size: 22px;
+    font-weight: 700;
   }
-  #selected-region .unit { font-size: 11px; color: #7c8891; }
-  #legend-bar { display: flex; height: 10px; border-radius: 4px; overflow: hidden; }
+  #selected-region .unit {
+    font-size: 11px;
+    color: #7c8891;
+  }
+
+  #legend-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
   #legend-bar div { flex: 1; }
   #legend-ticks {
-    display: flex; justify-content: space-between;
-    margin-top: 6px; font-size: 10.5px; color: #5a656d;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: #5a656d;
     font-family: ui-monospace, Menlo, monospace;
   }
-  #ranked-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+
+  #ranked-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
   .rank-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
     border: 1px solid transparent;
   }
-  .rank-row.selected { background: #161c20; border: 1px solid #2a333a; }
-  .rank-row .idx { width: 18px; font-size: 11px; color: #57626a; font-family: ui-monospace, Menlo, monospace; }
-  .rank-row .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .rank-row.selected {
+    background: #161c20;
+    border: 1px solid #2a333a;
+  }
+  .rank-row .idx {
+    width: 18px;
+    font-size: 11px;
+    color: #57626a;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .rank-row .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
   .rank-row .name { flex: 1; font-size: 13px; }
-  .rank-row .val { font-size: 13px; font-family: ui-monospace, Menlo, monospace; color: #c8cdd0; }
+  .rank-row .val {
+    font-size: 13px;
+    font-family: ui-monospace, Menlo, monospace;
+    color: #c8cdd0;
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="viewport">
-    <div class="label-top">Injury Density — Anatomical Mannequin</div>
-    <div id="multi-card">
-      <div class="label">Multiple Body Parts</div>
-      <div class="value" id="multi-value">0</div>
-      <div class="sub">injuries reported</div>
-    </div>
+    <div class="label-top">Injury Density — Interactive Model</div>
     <div id="canvas-mount"></div>
-    <div class="hint">drag to rotate · scroll to zoom · click a web to select</div>
+    <div class="controls">
+      <button class="btn active" id="btn-autorotate">⏸ Pause spin</button>
+      <button class="btn" id="btn-reset">⟲ Reset view</button>
+    </div>
+    <div class="hint">drag to rotate · click a region for detail</div>
   </div>
+
   <div id="panel">
     <div>
       <div class="section-label">Selected region</div>
-      <div id="selected-region"><span class="empty">Hover or click an injury web on the model</span></div>
+      <div id="selected-region"><span class="empty">Hover or click a body region on the model</span></div>
     </div>
+
     <div>
       <div class="section-label">Scale</div>
       <div id="legend-bar"></div>
       <div id="legend-ticks"><span>0</span><span id="legend-mid"></span><span id="legend-max"></span></div>
     </div>
+
     <div style="flex:1; min-height:0; display:flex; flex-direction:column;">
       <div class="section-label">Hot spots, ranked</div>
       <div id="ranked-list"></div>
@@ -112,274 +205,210 @@ https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js
 </div>
 
 <script>
+  // -------------------------------------------------------------------
+  // INJURY DATA — replace these counts (and add/remove regions) with
+  // real figures pulled from your Power BI dataset / Excel source.
+  // -------------------------------------------------------------------
   const INJURY_DATA = [
-    { id: "abdomen",     label: "Abdomen",             count: 8,  part: "abdomen"  },
-    { id: "ankle",       label: "Ankle",               count: 15, part: "ankle"    },
-    { id: "arm_elbow",   label: "Arm/Elbow",           count: 22, part: "arm"      },
-    { id: "back",        label: "Back",                count: 30, part: "back"     },
-    { id: "eyes",        label: "Eyes",                count: 2,  part: "eyes"     },
-    { id: "hand_finger", label: "Hand/Finger",         count: 18, part: "hand"     },
-    { id: "leg_lower",   label: "Leg Lower",           count: 12, part: "legLower" },
-    { id: "leg_upper",   label: "Leg Upper",           count: 14, part: "legUpper" },
-    { id: "multiple",    label: "Multiple Body Parts", count: 5,  part: null       },
-    { id: "neck",        label: "Neck",                count: 4,  part: "neck"     },
-    { id: "shoulder",    label: "Shoulder",            count: 19, part: "shoulder" },
+    { id: "head", label: "Head", count: 1, part: "head" },
+    { id: "neck", label: "Neck", count: 3, part: "neck" },
+    { id: "l_shoulder", label: "L. Shoulder", count: 14, part: "shoulderL" },
+    { id: "r_shoulder", label: "R. Shoulder", count: 22, part: "shoulderR" },
+    { id: "chest", label: "Chest / Torso", count: 4, part: "torso" },
+    { id: "lower_back", label: "Lower Back", count: 27, part: "lowerBack" },
+    { id: "l_elbow", label: "L. Elbow", count: 6, part: "elbowL" },
+    { id: "r_elbow", label: "R. Elbow", count: 9, part: "elbowR" },
+    { id: "l_wrist", label: "L. Wrist / Hand", count: 11, part: "handL" },
+    { id: "r_wrist", label: "R. Wrist / Hand", count: 19, part: "handR" },
+    { id: "hip", label: "Hip", count: 16, part: "hip" },
+    { id: "l_thigh", label: "L. Thigh / Hamstring", count: 21, part: "thighL" },
+    { id: "r_thigh", label: "R. Thigh / Hamstring", count: 18, part: "thighR" },
+    { id: "l_knee", label: "L. Knee", count: 25, part: "kneeL" },
+    { id: "r_knee", label: "R. Knee", count: 13, part: "kneeR" },
+    { id: "l_ankle", label: "L. Ankle / Foot", count: 8, part: "ankleL" },
+    { id: "r_ankle", label: "R. Ankle / Foot", count: 12, part: "ankleR" },
   ];
 
-  const MAPPABLE = INJURY_DATA.filter(d => d.part);
-  const maxCount = Math.max(...MAPPABLE.map(d => d.count));
-  const dataByPart = Object.fromEntries(MAPPABLE.map(d => [d.part, d]));
-  const dataById   = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
-  const multipleData = INJURY_DATA.find(d => d.id === "multiple");
+  const maxCount = Math.max(...INJURY_DATA.map(d => d.count));
+  const dataByPart = Object.fromEntries(INJURY_DATA.map(d => [d.part, d]));
+  const dataById = Object.fromEntries(INJURY_DATA.map(d => [d.id, d]));
 
-  function heatColor(t) {
-    t = Math.max(0, Math.min(1, t));
-    const start = [211, 211, 211], end = [139, 0, 0];
-    const r = Math.round(start[0] + (end[0] - start[0]) * t);
-    const g = Math.round(start[1] + (end[1] - start[1]) * t);
-    const b = Math.round(start[2] + (end[2] - start[2]) * t);
-    return { css: `rgb(${r},${g},${b})`, hex: (r << 16) | (g << 8) | b };
+  function thermalColor(t) {
+    const stops = [
+      { p: 0, c: [10, 60, 66] },
+      { p: 0.35, c: [24, 130, 122] },
+      { p: 0.6, c: [230, 170, 40] },
+      { p: 0.8, c: [224, 96, 34] },
+      { p: 1, c: [214, 30, 40] },
+    ];
+    let a = stops[0], b = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (t >= stops[i].p && t <= stops[i + 1].p) { a = stops[i]; b = stops[i + 1]; break; }
+    }
+    const span = (b.p - a.p) || 1;
+    const lt = (t - a.p) / span;
+    const r = Math.round(a.c[0] + (b.c[0] - a.c[0]) * lt);
+    const g = Math.round(a.c[1] + (b.c[1] - a.c[1]) * lt);
+    const bl = Math.round(a.c[2] + (b.c[2] - a.c[2]) * lt);
+    return { css: `rgb(${r},${g},${bl})`, hex: (r << 16) | (g << 8) | bl };
   }
 
-  const mount = document.getElementById('canvas-mount');
+  const NEUTRAL_COLOR = 0x2a2f36;
+
+  function buildFigure() {
+    const group = new THREE.Group();
+    const interactive = [];
+
+    function addPart(part, geo, pos) {
+      const d = dataByPart[part];
+      const t = d ? d.count / maxCount : 0;
+      const color = d ? thermalColor(t).hex : NEUTRAL_COLOR;
+      const mat = new THREE.MeshStandardMaterial({
+        color, roughness: 0.45, metalness: 0.08, emissive: 0x000000, emissiveIntensity: 0,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(...pos);
+      mesh.userData.part = part;
+      mesh.userData.baseColor = color;
+      group.add(mesh);
+      if (d) interactive.push(mesh);
+      return mesh;
+    }
+    function addNeutral(geo, pos) {
+      const mat = new THREE.MeshStandardMaterial({ color: NEUTRAL_COLOR, roughness: 0.6 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(...pos);
+      group.add(mesh);
+      return mesh;
+    }
+
+    addPart("head", new THREE.SphereGeometry(0.34, 24, 24), [0, 3.35, 0]);
+    addPart("neck", new THREE.CylinderGeometry(0.13, 0.15, 0.22, 16), [0, 3.0, 0]);
+    addPart("torso", new THREE.BoxGeometry(0.85, 1.05, 0.45), [0, 2.35, 0]);
+    addPart("lowerBack", new THREE.BoxGeometry(0.72, 0.32, 0.4), [0, 1.68, -0.02]);
+    addPart("hip", new THREE.BoxGeometry(0.78, 0.28, 0.42), [0, 1.38, 0]);
+
+    addPart("shoulderL", new THREE.SphereGeometry(0.19, 16, 16), [-0.56, 2.78, 0]);
+    addPart("shoulderR", new THREE.SphereGeometry(0.19, 16, 16), [0.56, 2.78, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.11, 0.1, 0.62, 12), [-0.58, 2.4, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.11, 0.1, 0.62, 12), [0.58, 2.4, 0]);
+
+    addPart("elbowL", new THREE.SphereGeometry(0.115, 14, 14), [-0.58, 2.06, 0]);
+    addPart("elbowR", new THREE.SphereGeometry(0.115, 14, 14), [0.58, 2.06, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.095, 0.08, 0.56, 12), [-0.58, 1.72, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.095, 0.08, 0.56, 12), [0.58, 1.72, 0]);
+
+    addPart("handL", new THREE.SphereGeometry(0.1, 14, 14), [-0.58, 1.38, 0]);
+    addPart("handR", new THREE.SphereGeometry(0.1, 14, 14), [0.58, 1.38, 0]);
+
+    addPart("thighL", new THREE.CylinderGeometry(0.18, 0.15, 0.75, 14), [-0.24, 0.95, 0]);
+    addPart("thighR", new THREE.CylinderGeometry(0.18, 0.15, 0.75, 14), [0.24, 0.95, 0]);
+
+    addPart("kneeL", new THREE.SphereGeometry(0.145, 14, 14), [-0.24, 0.55, 0]);
+    addPart("kneeR", new THREE.SphereGeometry(0.145, 14, 14), [0.24, 0.55, 0]);
+
+    addNeutral(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 12), [-0.24, 0.12, 0]);
+    addNeutral(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 12), [0.24, 0.12, 0]);
+
+    addPart("ankleL", new THREE.BoxGeometry(0.18, 0.14, 0.34), [-0.24, -0.28, 0.06]);
+    addPart("ankleR", new THREE.BoxGeometry(0.18, 0.14, 0.34), [0.24, -0.28, 0.06]);
+
+    group.position.y = -1.9;
+    return { group, interactive };
+  }
+
+  // ---------------- side panel rendering (plain DOM) ----------------
+  function renderLegend() {
+    const bar = document.getElementById("legend-bar");
+    for (let i = 0; i < 40; i++) {
+      const seg = document.createElement("div");
+      seg.style.background = thermalColor(i / 39).css;
+      bar.appendChild(seg);
+    }
+    document.getElementById("legend-mid").textContent = Math.round(maxCount / 2);
+    document.getElementById("legend-max").textContent = maxCount;
+  }
+
+  function renderRankedList(selectedId, onPick) {
+    const list = document.getElementById("ranked-list");
+    list.innerHTML = "";
+    const sorted = [...INJURY_DATA].sort((a, b) => b.count - a.count);
+    sorted.forEach((d, i) => {
+      const row = document.createElement("div");
+      row.className = "rank-row" + (d.id === selectedId ? " selected" : "");
+      row.innerHTML = `
+        <span class="idx">${i + 1}</span>
+        <span class="swatch" style="background:${thermalColor(d.count / maxCount).css}"></span>
+        <span class="name">${d.label}</span>
+        <span class="val">${d.count}</span>
+      `;
+      row.addEventListener("click", () => onPick(d.id));
+      list.appendChild(row);
+    });
+  }
+
+  function renderSelected(id) {
+    const el = document.getElementById("selected-region");
+    const d = id ? dataById[id] : null;
+    if (!d) {
+      el.innerHTML = `<span class="empty">Hover or click a body region on the model</span>`;
+      return;
+    }
+    el.innerHTML = `
+      <span class="name">${d.label}</span>
+      <span class="count" style="color:${thermalColor(d.count / maxCount).css}">${d.count}</span>
+      <span class="unit">injuries</span>
+    `;
+  }
+
+  // ---------------- three.js setup ----------------
+  const mount = document.getElementById("canvas-mount");
+  const width = mount.clientWidth;
+  const height = mount.clientHeight;
+
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0d10);
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  camera.position.set(0, 1.8, 4.6);
+  camera.lookAt(0, 0.6, 0);
 
-  const camera = new THREE.PerspectiveCamera(35, mount.clientWidth / mount.clientHeight, 0.1, 100);
-  camera.position.set(0, 0.2, 6.2);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(mount.clientWidth, mount.clientHeight);
-  renderer.outputEncoding = THREE.sRGBEncoding;
   mount.appendChild(renderer.domElement);
 
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.1;
-  controls.target.set(0, 0.0, 0);
-  controls.minDistance = 2.5;
-  controls.maxDistance = 12;
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(3, 5, 4);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+  fill.position.set(-3, 2, -4);
+  scene.add(fill);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-  const key = new THREE.DirectionalLight(0xffffff, 0.85);
-  key.position.set(4, 6, 5); scene.add(key);
-  const fill = new THREE.DirectionalLight(0xa8b5c4, 0.35);
-  fill.position.set(-4, 2, 3); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 0.55);
-  rim.position.set(0, 3, -6); scene.add(rim);
+  const { group, interactive } = buildFigure();
+  scene.add(group);
 
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xd6d6d6, roughness: 0.72, metalness: 0.04 });
-  const jointMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.55, metalness: 0.08 });
-
-  const mannequin = new THREE.Group();
-  scene.add(mannequin);
-
-  function addMesh(geo, mat, pos, rot, scl, parent = mannequin) {
-    const m = new THREE.Mesh(geo, mat);
-    if (pos) m.position.set(...pos);
-    if (rot) m.rotation.set(...rot);
-    if (scl) m.scale.set(...scl);
-    parent.add(m);
-    return m;
-  }
-
-  {
-    const pts = [];
-    for (let i = 0; i <= 24; i++) {
-      const t = i / 24;
-      const angle = t * Math.PI;
-      const r = Math.sin(angle) * 0.20;
-      const y = -Math.cos(angle) * 0.24;
-      pts.push(new THREE.Vector2(r, y));
-    }
-    const headGeo = new THREE.LatheGeometry(pts, 32);
-    addMesh(headGeo, skinMat, [0, 1.80, 0]);
-  }
-
-  addMesh(new THREE.CylinderGeometry(0.10, 0.13, 0.22, 24), skinMat, [0, 1.47, 0]);
-
-  {
-    const torsoPts = [
-      new THREE.Vector2(0.05, 0.00),
-      new THREE.Vector2(0.24, 0.02),
-      new THREE.Vector2(0.28, 0.15),
-      new THREE.Vector2(0.32, 0.32),
-      new THREE.Vector2(0.38, 0.55),
-      new THREE.Vector2(0.40, 0.72),
-      new THREE.Vector2(0.34, 0.86),
-      new THREE.Vector2(0.18, 0.94),
-      new THREE.Vector2(0.02, 1.00),
-    ];
-    const torsoGeo = new THREE.LatheGeometry(torsoPts, 40);
-    addMesh(torsoGeo, skinMat, [0, 0.42, 0]);
-  }
-
-  {
-    const hipPts = [
-      new THREE.Vector2(0.02, 0.00),
-      new THREE.Vector2(0.24, 0.02),
-      new THREE.Vector2(0.32, 0.10),
-      new THREE.Vector2(0.34, 0.22),
-      new THREE.Vector2(0.30, 0.32),
-      new THREE.Vector2(0.05, 0.36),
-    ];
-    const hipGeo = new THREE.LatheGeometry(hipPts, 32);
-    addMesh(hipGeo, skinMat, [0, 0.06, 0]);
-  }
-
-  addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [-0.42, 1.30, 0]);
-  addMesh(new THREE.SphereGeometry(0.13, 24, 20), jointMat, [ 0.42, 1.30, 0]);
-  addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [-0.50, 0.99, 0], [0, 0, 0.15]);
-  addMesh(new THREE.CylinderGeometry(0.09, 0.085, 0.62, 22), skinMat, [ 0.50, 0.99, 0], [0, 0, -0.15]);
-  addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [-0.55, 0.66, 0]);
-  addMesh(new THREE.SphereGeometry(0.095, 22, 18), jointMat, [ 0.55, 0.66, 0]);
-  addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [-0.58, 0.34, 0], [0, 0, 0.06]);
-  addMesh(new THREE.CylinderGeometry(0.08, 0.07, 0.58, 22), skinMat, [ 0.58, 0.34, 0], [0, 0, -0.06]);
-  addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [-0.60, 0.02, 0]);
-  addMesh(new THREE.SphereGeometry(0.07, 20, 16), jointMat, [ 0.60, 0.02, 0]);
-
-  {
-    const handL = addMesh(new THREE.SphereGeometry(0.10, 22, 18), skinMat, [-0.60, -0.12, 0]);
-    handL.scale.set(0.65, 1.35, 0.5);
-    const handR = addMesh(new THREE.SphereGeometry(0.10, 22, 18), skinMat, [ 0.60, -0.12, 0]);
-    handR.scale.set(0.65, 1.35, 0.5);
-  }
-
-  addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [-0.16, -0.05, 0]);
-  addMesh(new THREE.SphereGeometry(0.12, 22, 18), jointMat, [ 0.16, -0.05, 0]);
-  addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [-0.18, -0.44, 0]);
-  addMesh(new THREE.CylinderGeometry(0.14, 0.11, 0.75, 24), skinMat, [ 0.18, -0.44, 0]);
-  addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [-0.18, -0.84, 0]);
-  addMesh(new THREE.SphereGeometry(0.11, 22, 18), jointMat, [ 0.18, -0.84, 0]);
-  addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [-0.18, -1.22, 0]);
-  addMesh(new THREE.CylinderGeometry(0.10, 0.075, 0.70, 22), skinMat, [ 0.18, -1.22, 0]);
-  addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [-0.18, -1.60, 0]);
-  addMesh(new THREE.SphereGeometry(0.075, 20, 16), jointMat, [ 0.18, -1.60, 0]);
-
-  {
-    const footShape = new THREE.Shape();
-    footShape.moveTo(-0.06, -0.05);
-    footShape.quadraticCurveTo(-0.10,  0.05, -0.06,  0.24);
-    footShape.quadraticCurveTo( 0.00,  0.32,  0.06,  0.24);
-    footShape.quadraticCurveTo( 0.10,  0.05,  0.06, -0.05);
-    footShape.quadraticCurveTo( 0.00, -0.08, -0.06, -0.05);
-    const footGeo = new THREE.ExtrudeGeometry(footShape, {
-      depth: 0.08, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 3, curveSegments: 24,
-    });
-    addMesh(footGeo, skinMat, [-0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
-    addMesh(footGeo, skinMat, [ 0.18, -1.72, -0.05], [-Math.PI/2, 0, 0]);
-  }
-
-  {
-    const discGeo = new THREE.CircleGeometry(0.9, 48);
-    const discMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.rotation.x = -Math.PI / 2;
-    disc.position.y = -1.78;
-    mannequin.add(disc);
-  }
-
-  mannequin.position.y = 0.15;
-
-  function createWeb(radius, colorHex) {
-    const group = new THREE.Group();
-    const geo = new THREE.IcosahedronGeometry(radius, 1);
-    const shell = new THREE.Mesh(geo,
-      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide }));
-    const edges = new THREE.EdgesGeometry(geo);
-    const lines = new THREE.LineSegments(edges,
-      new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.9 }));
-    group.add(shell); group.add(lines);
-    group.userData.shell = shell;
-    group.userData.lines = lines;
-    group.userData.baseOpacityShell = 0.14;
-    group.userData.baseOpacityLines = 0.9;
-    return group;
-  }
-
-  const webRegistry = [];
-  const shellMeshes = [];
-  const webByRegion = {};
-
-  function registerWeb(web, region) {
-    const d = dataByPart[region];
-    if (!d) return;
-    web.userData.region = region;
-    web.userData.id = d.id;
-    web.userData.shell.userData.parentWeb = web;
-    webRegistry.push({ web, region, id: d.id, shell: web.userData.shell });
-    shellMeshes.push(web.userData.shell);
-    if (!webByRegion[region]) webByRegion[region] = [];
-    webByRegion[region].push(web);
-  }
-
-  const POINT_WEBS = [
-    { region: 'eyes',     pos: [-0.08, 1.85, 0.16], radius: 0.06 },
-    { region: 'eyes',     pos: [ 0.08, 1.85, 0.16], radius: 0.06 },
-    { region: 'neck',     pos: [ 0.00, 1.47, 0.00], radius: 0.13 },
-    { region: 'shoulder', pos: [-0.42, 1.30, 0.00], radius: 0.16 },
-    { region: 'shoulder', pos: [ 0.42, 1.30, 0.00], radius: 0.16 },
-    { region: 'abdomen',  pos: [ 0.00, 0.85, 0.15], radius: 0.18 },
-    { region: 'back',     pos: [ 0.00, 0.85,-0.15], radius: 0.18 },
-    { region: 'hand',     pos: [-0.60,-0.14, 0.00], radius: 0.12 },
-    { region: 'hand',     pos: [ 0.60,-0.14, 0.00], radius: 0.12 },
-    { region: 'ankle',    pos: [-0.18,-1.62, 0.02], radius: 0.11 },
-    { region: 'ankle',    pos: [ 0.18,-1.62, 0.02], radius: 0.11 },
-  ];
-
-  POINT_WEBS.forEach(cfg => {
-    const d = dataByPart[cfg.region];
-    if (!d) return;
-    const color = heatColor(d.count / maxCount).hex;
-    const web = createWeb(cfg.radius, color);
-    web.position.set(...cfg.pos);
-    mannequin.add(web);
-    registerWeb(web, cfg.region);
-  });
-
-  const SEGMENT_WEBS = [
-    { region: 'arm',      from: [-0.48, 1.26, 0], to: [-0.55, 0.68, 0], radius: 0.13 },
-    { region: 'arm',      from: [-0.55, 0.64, 0], to: [-0.60, 0.06, 0], radius: 0.11 },
-    { region: 'arm',      from: [ 0.48, 1.26, 0], to: [ 0.55, 0.68, 0], radius: 0.13 },
-    { region: 'arm',      from: [ 0.55, 0.64, 0], to: [ 0.60, 0.06, 0], radius: 0.11 },
-    { region: 'legUpper', from: [-0.16,-0.05, 0], to: [-0.18,-0.82, 0], radius: 0.19 },
-    { region: 'legUpper', from: [ 0.16,-0.05, 0], to: [ 0.18,-0.82, 0], radius: 0.19 },
-    { region: 'legLower', from: [-0.18,-0.86, 0], to: [-0.18,-1.56, 0], radius: 0.14 },
-    { region: 'legLower', from: [ 0.18,-0.86, 0], to: [ 0.18,-1.56, 0], radius: 0.14 },
-  ];
-
-  const _upVec = new THREE.Vector3(0, 1, 0);
-  SEGMENT_WEBS.forEach(cfg => {
-    const d = dataByPart[cfg.region];
-    if (!d) return;
-    const color = heatColor(d.count / maxCount).hex;
-    const web = createWeb(cfg.radius, color);
-    const from = new THREE.Vector3(...cfg.from);
-    const to   = new THREE.Vector3(...cfg.to);
-    const mid = from.clone().add(to).multiplyScalar(0.5);
-    const dir = to.clone().sub(from);
-    const length = dir.length();
-    dir.normalize();
-    const q = new THREE.Quaternion().setFromUnitVectors(_upVec, dir);
-    web.position.copy(mid);
-    web.quaternion.copy(q);
-    web.scale.set(1, (length / (2 * cfg.radius)) * 1.15, 1);
-    web.userData.baseScaleY = web.scale.y;
-    mannequin.add(web);
-    registerWeb(web, cfg.region);
-  });
+  const partToData = {};
+  interactive.forEach(m => { partToData[m.userData.part] = dataByPart[m.userData.part]; });
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  const state = { hoveredRegion: null, selectedRegion: null, selectedId: null };
 
-  function setRegionHighlight(region, active) {
-    if (!region || !webByRegion[region]) return;
-    webByRegion[region].forEach(web => {
-      web.userData.shell.material.opacity = active ? 0.42 : web.userData.baseOpacityShell;
-      web.userData.lines.material.opacity = active ? 1.0  : web.userData.baseOpacityLines;
-    });
+  const state = {
+    autoRotate: true,
+    dragging: false,
+    lastX: 0, lastY: 0,
+    rotY: 0.4, rotX: 0,
+    hoveredMesh: null,
+    selectedMesh: null,
+    selectedId: null,
+  };
+
+  function setMeshHighlight(mesh, active) {
+    if (!mesh) return;
+    mesh.material.emissive.setHex(active ? mesh.userData.baseColor : 0x000000);
+    mesh.material.emissiveIntensity = active ? 0.55 : 0;
   }
 
   function updatePointer(clientX, clientY) {
@@ -388,137 +417,95 @@ https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js
     pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
   }
 
-  function pickRegion() {
+  function pickMesh() {
     raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(shellMeshes, false);
-    return hits.length ? hits[0].object.userData.parentWeb.userData.region : null;
+    const hits = raycaster.intersectObjects(interactive, false);
+    return hits.length ? hits[0].object : null;
   }
 
-  renderer.domElement.addEventListener('pointermove', (e) => {
-    updatePointer(e.clientX, e.clientY);
-    const region = pickRegion();
-    if (region !== state.hoveredRegion) {
-      if (state.hoveredRegion && state.hoveredRegion !== state.selectedRegion) {
-        setRegionHighlight(state.hoveredRegion, false);
-      }
-      state.hoveredRegion = region;
-      if (region) setRegionHighlight(region, true);
-      if (region && dataByPart[region]) renderSelected(dataByPart[region].id);
-      else if (state.selectedId) renderSelected(state.selectedId);
-      else renderSelected(null);
-    }
-  });
-
-  let downX = 0, downY = 0;
-  renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
-  renderer.domElement.addEventListener('pointerup', (e) => {
-    const moved = Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY);
-    if (moved > 4) return;
-    updatePointer(e.clientX, e.clientY);
-    const region = pickRegion();
-    if (region && dataByPart[region]) selectById(dataByPart[region].id);
-  });
-
   function selectById(id) {
-    const d = dataById[id];
-    if (!d || !d.part) return;
-    if (state.selectedRegion && state.selectedRegion !== d.part) {
-      setRegionHighlight(state.selectedRegion, state.selectedRegion === state.hoveredRegion);
+    const mesh = interactive.find(m => partToData[m.userData.part].id === id);
+    if (!mesh) return;
+    if (state.selectedMesh && state.selectedMesh !== mesh) {
+      setMeshHighlight(state.selectedMesh, state.selectedMesh === state.hoveredMesh);
     }
+    state.selectedMesh = mesh;
     state.selectedId = id;
-    state.selectedRegion = d.part;
-    setRegionHighlight(d.part, true);
+    setMeshHighlight(mesh, true);
     renderSelected(id);
     renderRankedList(id, selectById);
   }
 
-  function renderLegend() {
-    const bar = document.getElementById('legend-bar');
-    bar.innerHTML = '';
-    for (let i = 0; i < 40; i++) {
-      const seg = document.createElement('div');
-      seg.style.background = heatColor(i / 39).css;
-      bar.appendChild(seg);
+  mount.addEventListener("pointerdown", (e) => {
+    state.dragging = true;
+    mount.classList.add("dragging");
+    state.autoRotate = false;
+    document.getElementById("btn-autorotate").classList.remove("active");
+    document.getElementById("btn-autorotate").textContent = "▶ Auto-rotate";
+    state.lastX = e.clientX;
+    state.lastY = e.clientY;
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (state.dragging) {
+      const dx = e.clientX - state.lastX;
+      const dy = e.clientY - state.lastY;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      state.rotY += dx * 0.01;
+      state.rotX = Math.max(-0.6, Math.min(0.6, state.rotX + dy * 0.01));
+    } else {
+      updatePointer(e.clientX, e.clientY);
+      const mesh = pickMesh();
+      if (mesh !== state.hoveredMesh) {
+        setMeshHighlight(state.hoveredMesh, state.hoveredMesh === state.selectedMesh);
+        state.hoveredMesh = mesh;
+        setMeshHighlight(mesh, true);
+        renderSelected(mesh ? partToData[mesh.userData.part].id : state.selectedId);
+      }
     }
-    document.getElementById('legend-mid').textContent = Math.round(maxCount / 2);
-    document.getElementById('legend-max').textContent = maxCount;
-  }
+  });
 
-  function renderRankedList(selectedId, onPick) {
-    const list = document.getElementById('ranked-list');
-    list.innerHTML = '';
-    const sorted = MAPPABLE.slice().sort((a, b) => b.count - a.count);
-    sorted.forEach((d, i) => {
-      const row = document.createElement('div');
-      row.className = 'rank-row' + (d.id === selectedId ? ' selected' : '');
-      row.innerHTML = `
-        <span class="idx">${i + 1}</span>
-        <span class="swatch" style="background:${heatColor(d.count / maxCount).css}"></span>
-        <span class="name">${d.label}</span>
-        <span class="val">${d.count}</span>
-      `;
-      row.addEventListener('click', () => onPick(d.id));
-      list.appendChild(row);
-    });
-  }
-
-  function renderSelected(id) {
-    const el = document.getElementById('selected-region');
-    const d = id ? dataById[id] : null;
-    if (!d || !d.part) {
-      el.innerHTML = `<span class="empty">Hover or click an injury web on the model</span>`;
-      return;
+  window.addEventListener("pointerup", (e) => {
+    const moved = Math.abs(e.clientX - state.lastX) + Math.abs(e.clientY - state.lastY);
+    state.dragging = false;
+    mount.classList.remove("dragging");
+    if (moved < 3) {
+      updatePointer(e.clientX, e.clientY);
+      const mesh = pickMesh();
+      if (mesh) selectById(partToData[mesh.userData.part].id);
     }
-    const color = heatColor(d.count / maxCount).css;
-    el.innerHTML = `
-      <span class="name">${d.label}</span>
-      <span class="count" style="color:${color}">${d.count}</span>
-      <span class="unit">injuries</span>
-    `;
-  }
+  });
 
-  function renderMultipleCard() {
-    document.getElementById('multi-value').textContent = multipleData ? multipleData.count : 0;
-  }
-
-  renderLegend();
-  renderRankedList(null, selectById);
-  renderSelected(null);
-  renderMultipleCard();
-
-  const clock = new THREE.Clock();
+  document.getElementById("btn-autorotate").addEventListener("click", () => {
+    state.autoRotate = !state.autoRotate;
+    const btn = document.getElementById("btn-autorotate");
+    btn.classList.toggle("active", state.autoRotate);
+    btn.textContent = state.autoRotate ? "⏸ Pause spin" : "▶ Auto-rotate";
+  });
+  document.getElementById("btn-reset").addEventListener("click", () => {
+    state.rotY = 0.4;
+    state.rotX = 0;
+  });
 
   function animate() {
-    requestAnimationFrame(animate);
-    const t = clock.getElapsedTime();
-
-    mannequin.rotation.y = Math.sin(t * 0.4) * 0.05;
-    mannequin.position.y = 0.15 + Math.sin(t * 0.8) * 0.015;
-
-    const pulse = 1 + Math.sin(t * 2) * 0.04;
-    webRegistry.forEach(({ web, region }) => {
-      const isSegment = web.userData.baseScaleY !== undefined;
-      if (isSegment) {
-        web.scale.set(pulse, web.userData.baseScaleY, pulse);
-      } else {
-        web.scale.setScalar(pulse);
-      }
-      const isActive = (region === state.hoveredRegion || region === state.selectedRegion);
-      const targetOpacity = isActive ? 1.0 : 0.82 + Math.sin(t * 3 + region.length) * 0.12;
-      web.userData.lines.material.opacity = targetOpacity;
-    });
-
-    controls.update();
+    if (state.autoRotate) state.rotY += 0.006;
+    group.rotation.set(state.rotX, state.rotY, 0);
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
   }
   animate();
 
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     const w = mount.clientWidth, h = mount.clientHeight;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
   });
+
+  renderLegend();
+  renderRankedList(null, selectById);
+  renderSelected(null);
 </script>
 </body>
 </html>
